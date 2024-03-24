@@ -7,7 +7,7 @@
 #* Organization: The Peregrine Fund
 #************************************
 # hacking = # hacked
-# suvccess= successful hack
+# success= successful hack
 
 # Link history from banding data 
 # to territory name, number and year combined in nest success
@@ -20,20 +20,26 @@
 library('lubridate')
 library('readxl')
 dfl <- "data\\RIHA data 2015-2017_v2.xlsx"
-df <- read_excel(dfl, sheet='2015_2017_Banding data', na=c('#N/A', 'n/a','N/A', '', 'NA', '-') ) # live/dead tibble
-# separate unmarked birds
-df.um <- df[df$OID==999,] # unmarked df
-df.m <- df[df$OID!=999 & df$Code...10!='none',] # marked df
-df.m <- df.m[!is.na(df.m$OID),]
+df <- read_excel(dfl, sheet='2015_2017_Banding data', na=c('#N/A', 'n/a','N/A', '', 'NA', '-', 
+                          "None", "Not Recorded", "Not recorded") ) # live/dead tibble
+df$ID <- paste(df$Code...8, df$Code...10, 
+               df$`Left Color`, df$`Right color`, sep="-")
 
-df.m.nodups <- df.m[!duplicated(df.m$OID), ]
+# separate unmarked birds
+not.banded <- c("NA-NA-NA-NA", "NA-NA-No band-No band")
+df.unmarked <- df[df$ID %in% not.banded,] # unmarked df
+
+df.marked <- df[df$Sex=="Female",]
+df.marked <- df.marked[!df.marked$ID %in% not.banded,] # marked df
+df.marked <- df.marked[!is.na(df.marked$ID),]
+df.marked.nodups <- df.marked[!duplicated(df.marked$ID, df.marked$`Year banded/Resighted`), ]
 
 #**********************
 #* 2. Extract counts 
 #**********************
 # 'B NB N' - 0= Not seen, 1= Nestling, 2=Nonbreeder, 3= Breeder
-counts.marked <- table(df.m.nodups$'B NB N', df.m.nodups$'Year banded/Resighted', df.m.nodups$Sex)
-counts.unmarked <- table(df.um$'B NB N', df.um$'Year banded/Resighted', df.um$Sex)
+counts.marked <- table(df.marked.nodups$'B NB N', df.marked.nodups$'Year banded/Resighted', df.marked.nodups$Sex)
+counts.unmarked <- table(df.unmarked$'B NB N', df.unmarked$'Year banded/Resighted', df.unmarked$Sex)
 
 #**********************
 #* 3. Territory occupancy 
@@ -52,8 +58,8 @@ occ <- tapply(df$Territoy_number, list(df$Territoy_number, df$`Year banded/Resig
 # Nestlings- early Mar-late Dec.
 # Fledglings- mid-April to May first nests, or July for 3rd nest attempts
 # Cutoff dates for annual cycle
-fyr <- min(df.m$`Year banded/Resighted`, na.rm=T)
-lyr <- max(df.m$`Year banded/Resighted`, na.rm=T)
+fyr <- min(df.marked$`Year banded/Resighted`, na.rm=T)
+lyr <- max(df.marked$`Year banded/Resighted`, na.rm=T)
 df.cut <- data.frame(
   start = paste0(fyr:(lyr-1), "-07-14"), # cutoffs around first fledging
   end = paste0((fyr+1):lyr, "-07-14"),
@@ -61,35 +67,46 @@ df.cut <- data.frame(
 df.cut$yr_int <- df.cut$start %--% df.cut$end 
 
 nyr <- lyr-fyr+1
-nind <- length(unique(df.m$OID))
-ind.nu <- sort(unique(df.m$OID))
+nind <- length(unique(df.marked$ID))
+ind.nu <- sort(unique(df.marked$ID))
 
 #**********************
 #* 3. Exposure lengths in days ----
 #**********************
-# From APLO
 # Mark-resight-recovery data
 #   Observations (po) = y  
-#     1 seen first year (age 0)
+#     1 seen first-year (age=0, just before 1st b-day)
 #     2 seen nonbreeder
 #     3 seen breeder
-#     4 recovered dead
-#     5 not seen
+#     4 not seen
 #   States (ps)
-#     1 alive first year
+#     1 alive first-year
 #     2 alive nonbreeder
 #     3 alive breeder
 #     4 dead
-#     5 dead not recovered
-#     6 emigrated alive
-#     7 emigrated dead
+#   Groups
+#     1 wild-born
+#     2 translocated and hacked
+#   Sex
+#     1 female
+#     2 male
 
 # detected/not detected
-det <- tapply(df.m$OID, list(df.m$OID, df.m$`Year banded/Resighted`), 
+det <- tapply(df.marked$ID, list(df.marked$ID, df.marked$`Year banded/Resighted`), 
               function(x) {ifelse(length(x)>0, 1, 0)}, default=0)
 # by stage
-y <- tapply(df.m$'B NB N', list(df.m$OID, df.m$`Year banded/Resighted`), 
+y <- tapply(df.marked$'B NB N', list(df.marked$ID, df.marked$`Year banded/Resighted`), 
               max,  na.rm=T, default=0)
+y[y==0] <- 4 # assign 'not seen' as a four
+
+# create z data when latent states are known
+z <- array(NA, dim = dim(y), dimnames=dimnames(y))
+z[] <- ifelse(y %in% c(2,3), y, NA)
+
+# population covariate 
+pop <- tapply(as.numeric(factor(df.marked$Population)), list(df.marked$ID, df.marked$`Year banded/Resighted`), 
+            max,  na.rm=T, default=NA)
+pop[pop=='-Inf'] <- NA
 
 #**********************
 #* 4. Calculate ages ----
@@ -109,17 +126,28 @@ for (i in 1:nind){
 # project ages into future
   for (i in 1:nind){
     for (t in (frst[i]+1):nyr){ 
-      if (frst[i]!= nyr)
+      if (frst[i] != nyr) {
       age[i, t] <- age[i, t-1] + 1
+      }
     }}
+# project ages into the past
+for (i in 1:nind){
+  for (t in (frst[i]):1){ 
+    if (frst[i] != 1) {
+      age[i, t-1] <- age[i, t] - 1
+    }
+  }}
 
 #**********************
 #* 7. Productivity data ----
 #**********************
 dflp <- "data\\RIHA data 2015-2017.xlsx"
-dfp <- read_excel(dfl, sheet='2015_2017_nest summary', na=c('#N/A', 'n/a','N/A', '', 'NA', '-') ) # live/dead tibble
-dfp$fledged <- ifelse(dfp$`# Fledged`!="NR", as.numeric(dfp$`# Fledged`), NA)
-fl <- tapply(dfp$fledged, list(dfp$`Territory Number`, dfp$Year), sum, na.rm=T)
+dfp <- read_excel(dfl, sheet='2015_2017_nest summary', na=c('#N/A', 'n/a','N/A', '', 'NA', '-', "NR") ) # live/dead tibble
+# omit "NO ID"s
+dfp <- dfp[substr(dfp$`Territory Number`, 1, 5)!="No ID", ]
+# omit NAs
+dfp <- dfp[!is.na(dfp$`# Fledged` ), ]
+fl <- tapply(dfp$`# Fledged`, list(dfp$`Territory Number`, dfp$Year), sum, na.rm=T)
 colSums(fl, na.rm=T)
 colMeans(fl, na.rm=T)
 
@@ -144,12 +172,7 @@ tr <- tapply(dfp$tr , list(dfp$`Territory Number`, dfp$Year), max, na.rm=T)
 # ie no immigration or emigration
 # Fostered birds will matter because they will directly influence 
 # productivity overall
-# 
-dfp$num.hacked <- ifelse(dfp$Hacking=="NR", NA, as.numeric(dfp$Hacking))
-tapply(dfp$num.hacked, list(dfp$Year), sum, na.rm=T)
-
-hacked <- dfp[dfp$Hacking!=0,]
-dfp$`Territory Number`
+hacked <- tapply(dfp$Hacking, list(dfp$Year), sum, na.rm=T)
 
 #**********************
 #* 8. Covariates ----
@@ -160,29 +183,25 @@ dfp$`Territory Number`
 #* 9. Data list for analysis ----
 #**********************
 datl <- list( # productivity data
-              prod_nest=fl,
-              prod_tot=colSums(fl, na.rm=T),
+              f=dfp$`# Fledged`,
               # survival data
               y=y,
               # count data
-              # indices
-
-              # deterministic data
+              countA = counts.marked[3,,1], # counts.marked[stage, year, sex]
+              countB = counts.marked[4,,1], 
+              countFYW = counts.marked[2,,1]
               )
 
 constl <- list( # survival 
-                sex=ld.nodups$sex, # manually check "unknowns" and "NA"s
                 transl=, # translocated
                 nind=nind,
                 nyr=nyr,
                 # productivity 
-                fledged=dfp$fledged,
-                nnests=nrow(dfp),
-                nter=,
+                nyr=nyr,
+                K=nrow(dfp),
+                year=as.numeric(factor(dfp$Year)), 
+                tr=dfp$tr,
                 fosters=, # number fostered
-                site_f=as.numeric(factor(dfp$Population)), # 
-                tr= dfp$tr, # nest treatment
-
-                J=
-
+                site_f=as.numeric(factor(dfp$Population)),
+                NH = hacked
 )

@@ -41,9 +41,6 @@ run_surv <- function(seed, datl, constl){
     #   Groups
     #     1 wild-born
     #     2 translocated and hacked
-    #   Sex
-    #     1 female
-    #     2 male
     ###################################################
     # PARAMETERS
     #   phiFY: survival probability first year 
@@ -71,26 +68,25 @@ run_surv <- function(seed, datl, constl){
 # priors for means
       for (pp in 1:p){ # coefficient
         for (h in 1:2){ # translocated
-          for (s in 1:2){ # sex
             for (m in 1:4){ # population
-            lmu[pp,s,h,m] <- logit(mu[pp,s,h])
-            mu[pp,s,h,m] <- dbeta(1,1)
-          }  } } }  # m population #s sex #h hacked #t time
+            lmu[pp,h,m] <- logit(mu[pp,h])
+            mu[pp,h,m] <- dbeta(1,1)
+          }  } }   # m population #s sex #h hacked #t time
       
 for (i in 1:nind){
   for (t in 1:(nyr-1)){
     #Survival
-    logit(phiFY[i,t]) <- lmu[1, sex[i], transl[i], pop[i]] + eps[1,t]  # first year
-    logit(phiA[i,t]) <- lmu[2, sex[i], transl[i], pop[i]] + eps[2,t] # nonbreeder
-    logit(phiB[i,t]) <- lmu[3, sex[i], transl[i], pop[i]] + eps[3,t]  # breeder
+    logit(phiFY[i,t]) <- lmu[1, transl[i], pop[i]] + eps[1,t]  # first year
+    logit(phiA[i,t]) <- lmu[2, transl[i], pop[i]] + eps[2,t] # nonbreeder
+    logit(phiB[i,t]) <- lmu[3, transl[i], pop[i]] + eps[3,t]  # breeder
     #Recruitment
-    logit(psiFYB[i,t]) <- lmu[4, sex[i], transl[i], pop[i]] + eps[4,t]  # first year to breeder
-    logit(psiAB[i,t]) <- lmu[5, sex[i], transl[i], pop[i]] + eps[5,t]  # nonbreeder to breeder
-    logit(psiBA[i,t]) <- lmu[6, sex[i], transl[i], pop[i]] + eps[6,t]  # breeder to nonbreeder
+    logit(psiFYB[i,t]) <- lmu[4, transl[i], pop[i]] + eps[4,t]  # first year to breeder
+    logit(psiAB[i,t]) <- lmu[5, transl[i], pop[i]] + eps[5,t]  # nonbreeder to breeder
+    logit(psiBA[i,t]) <- lmu[6, transl[i], pop[i]] + eps[6,t]  # breeder to nonbreeder
     #Re-encounter
-    logit(pFY[i,t]) <- lmu[7, sex[i], transl[i], pop[i]] + eps[7,t]  # resight of nonbreeders
-    logit(pA[i,t]) <- lmu[8, sex[i], transl[i], pop[i]] + eps[8,t]  # resight of nonbreeders
-    logit(pB[i,t]) <- lmu[9, sex[i], transl[i], pop[i]] + eps[9,t]  # resight of breeders
+    logit(pFY[i,t]) <- lmu[7, transl[i], pop[i]] + eps[7,t]  # resight of nonbreeders
+    logit(pA[i,t]) <- lmu[8, transl[i], pop[i]] + eps[8,t]  # resight of nonbreeders
+    logit(pB[i,t]) <- lmu[9, transl[i], pop[i]] + eps[9,t]  # resight of breeders
   }#t
 }#i
 
@@ -168,13 +164,14 @@ for (i in 1:nind){
       for (i in 1:nrow(TFmat) ){  TFmat[i,1:f[i]] <- FALSE }
       z.inits[TFmat] <- sample(size=445, c(2,3), replace=T, prob=c(0.5, 0.5) ) 
       # create inits for rhos
-      p <- 9
+      p <- 11
       Ustar <- array(runif(p*p, -0.5, 0.5), dim=c(p,p))
       diag(Ustar) <- 1 # set diagonal to 1
       Ustar[lower.tri(Ustar)] <- 0 # set lower diag to zero
       t(Ustar)%*%Ustar
       
       inits <- function(){ list(z = z.inits,
+                                lmu = array(runif(9*2*4), dim = c(9,2,4)),
                                 Ustar = Ustar) }
       
       n.chains=1; n.thin=10; n.iter=20000; n.burnin=10000
