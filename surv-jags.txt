@@ -1,0 +1,140 @@
+
+    model{
+######################
+## Try JAGS
+################
+####################################################
+####################################################
+# Mark-resight-recovery data
+#   Observations (po) = y  
+#     1 seen first-year (age=0, just before 1st b-day)
+#     2 seen nonbreeder
+#     3 seen breeder
+#     4 not seen
+#   States (ps)
+#     1 alive first-year
+#     2 alive nonbreeder
+#     3 alive breeder
+#     4 dead
+#   Groups
+#     1 wild-born
+#     2 translocated and hacked
+###################################################
+# PARAMETERS
+#   phiFY: apparent survival probability first year 
+#   phiA: apparent survival probability nonbreeders
+#   phiB: apparent survival probability breeders
+#   psiFYB: recruitment probability from first-year to breeder
+#   psiAB: recruitment probability from nonbreeders to breeder
+#   psiBA: recruitment probability from breeder to nonbreeders 
+#   pA: resight probability nonbreeders
+#   pB: resight probability breeders
+################################
+# Likelihood for survival
+################################ 
+# survival, recruitment, and detection can be 
+# temporally correlated
+# using a multivariate normal distribution
+
+# multivariate normal for temporal variance
+  for (t in 1:nyr){
+    eps[1:p,t] ~ dmnorm.vcov(mu.zeroes[1:p], sigma2[1:p, 1:p])
+  }
+
+# priors and diagonals
+for (j in 1:p){ # coefficients
+    sigma[j] ~ dnorm( 0, 1/(2*2) )T(0,)
+    sigma2[j,j] <- sigma[j]*sigma[j]*rho[j,j]
+    rho[j,j] <- 1
+    beta[j] ~ dnorm(0, 1/10*10)
+  for (m in 1:4){ # population
+    lmu[j,m] <- logit(mu[j,m])
+    mu[j,m] ~ dbeta(1,1)
+} # m
+  } # j
+
+# upper diagonal  
+  for (j in 1:(p-1)){
+    for (k in (j+1):p){
+      sigma2[j,k] <- sigma[j]*sigma[k] * rho[j,k] 
+      sigma2[k,j] <- sigma2[j,k]
+      rho[j,k] ~ dunif(-1,1)
+      rho[k,j] <- rho[j,k]
+  }}
+
+for (i in 1:nind){
+  for (t in 1:(nyr-1)){
+    #Survival
+    logit(phiFY[i,t]) <- eps[1,t] + lmu[1, site[i,t]] + beta[1]*hacked[i]  # first year
+    logit(phiA[i,t]) <- eps[2,t] + lmu[2, site[i,t]] +  beta[2]*hacked[i] # nonbreeder
+    logit(phiB[i,t]) <- eps[3,t]  + lmu[3, site[i,t]] + beta[3]*hacked[i] # breeder
+    #Recruitment
+    logit(psiFYB[i,t]) <- eps[4,t]  + lmu[4, site[i,t]] + beta[4]*hacked[i] # first year to breeder
+    logit(psiAB[i,t]) <- eps[5,t]  + lmu[5, site[i,t]] + beta[5]*hacked[i] # nonbreeder to breeder
+    logit(psiBA[i,t]) <- eps[6,t]  + lmu[6, site[i,t]] + beta[6]*hacked[i] # breeder to nonbreeder
+    #Re-encounter
+    logit(pA[i,t]) <- eps[7,t]  + lmu[7, site[i,t]] + beta[7]*hacked[i] # resight of nonbreeders
+    logit(pB[i,t]) <- eps[8,t]  + lmu[8, site[i,t]] + beta[8]*hacked[i] # resight of breeders
+  }#t
+}#i
+
+# Define state-transition and observation matrices
+for (i in 1:nind){  
+  # Define probabilities of state S(t+1) given S(t)
+  for (t in first[i]:(nyr-1)){
+    ps[1,i,t,1] <- 0
+    ps[1,i,t,2] <- phiFY[i,t] * (1-psiFYB[i,t]) 
+    ps[1,i,t,3] <- phiFY[i,t] * psiFYB[i,t]
+    ps[1,i,t,4] <- (1-phiFY[i,t])
+    
+    ps[2,i,t,1] <- 0
+    ps[2,i,t,2] <- phiA[i,t] * (1-psiAB[i,t])
+    ps[2,i,t,3] <- phiA[i,t] * psiAB[i,t]
+    ps[2,i,t,4] <- (1-phiA[i,t])
+    
+    ps[3,i,t,1] <- 0
+    ps[3,i,t,2] <- phiB[i,t] * psiBA[i,t]
+    ps[3,i,t,3] <- phiB[i,t] * (1-psiBA[i,t])
+    ps[3,i,t,4] <- (1-phiB[i,t])
+    
+    ps[4,i,t,1] <- 0
+    ps[4,i,t,2] <- 0
+    ps[4,i,t,3] <- 0
+    ps[4,i,t,4] <- 1
+    
+    # Define probabilities of O(t) given S(t)
+    po[1,i,t,1] <- 1 
+    po[1,i,t,2] <- 0
+    po[1,i,t,3] <- 0
+    po[1,i,t,4] <- 0
+    
+    po[2,i,t,1] <- 0
+    po[2,i,t,2] <- pA[i,t]
+    po[2,i,t,3] <- 0
+    po[2,i,t,4] <- (1-pA[i,t])
+    
+    po[3,i,t,1] <- 0
+    po[3,i,t,2] <- 0
+    po[3,i,t,3] <- pB[i,t]
+    po[3,i,t,4] <- (1-pB[i,t])
+    
+    po[4,i,t,1] <- 0
+    po[4,i,t,2] <- 0
+    po[4,i,t,3] <- 0
+    po[4,i,t,4] <- 1
+  } #t
+} #i
+
+# Likelihood 
+for (i in 1:nind){
+  # Define latent state at first capture
+  z[i,first[i]] <- y[i,first[i]]
+  for (t in (first[i]+1):nyr){
+    # State process: draw S(t) given S(t-1)
+    z[i,t] ~ dcat(ps[z[i,t-1], i, t-1, 1:4])
+    # Observation process: draw O(t) given S(t)
+    y[i,t] ~ dcat(po[z[i,t], i, t-1, 1:4])
+  } #t
+} #i
+} #model
+

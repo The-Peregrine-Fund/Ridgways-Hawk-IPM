@@ -7,7 +7,20 @@ library('nimbleHMC')
 library('MCMCvis')
 library('parallel')
 library ('coda')
-load("/scratch/brolek/aplo_ipm/data/data.Rdata")
+load("/bsuscratch/brianrolek/riha_ipm/data.RData")
+load("data/data.RData")
+
+# from IPMbook package
+dUnif <- function (lower, upper) 
+{
+  A <- round(lower)
+  B <- round(upper)
+  nrow <- length(lower)
+  out <- matrix(0, nrow = nrow, ncol = max(B))
+  n <- B - A + 1
+  for (i in 1:nrow) out[i, A[i]:B[i]] <- rep(1/n[i], n[i])
+  return(drop(out))
+}
 
 run_ipm <- function(seed, datl, constl){
   library('nimble')
@@ -70,13 +83,14 @@ run_ipm <- function(seed, datl, constl){
   ###############################
   # Priors for fecundity
   lmu.f.mean ~ dnorm(0, sd=2)
-  beta ~ dnorm(0, sd=2)
+  beta[1] ~ dnorm(0, sd=2)
+  beta[2] ~ dnorm(0, sd=2)
   logit(lmu.nu) <- mu.nu
-  mu.nu ~ dunif(0,1)
+  mu.nu ~ dbeta(1,1) # conjugate to Bernoulli
   
   for (k in 1:K){
     f[k] ~ T(dpois(z[k]*mu.f[k]), ,3)
-    log(mu.f[k]) <- lmu.f[year[k]] + beta*tr[k] 
+    log(mu.f[k]) <- lmu.f[year[k]] + beta[1]*treat[k] + beta[2]*num_transl[k] 
     z[k] ~ dbern(nu[year[k]])
   }
   
@@ -92,7 +106,6 @@ run_ipm <- function(seed, datl, constl){
     f.rep[k] ~ dpois( mu.f[k] * nu[year[k]] ) # expected counts
     f.dssm.obs[k] <- abs( ( (f.obs[k]) - (f.exp[k]) ) / (f.obs[k]+0.001) )
     f.dssm.rep[k] <- abs( ( (f.rep[k]) - (f.exp[k]) ) / (f.rep[k]+0.001) )
-  
   } # k
   f.dmape.obs <- sum(dssm.obs[1:K])
   f.dmape.rep <- sum(dssm.rep[1:K])
@@ -103,12 +116,9 @@ run_ipm <- function(seed, datl, constl){
   # Likelihood for counts
   ################################
   # Abundance for year=1
-  N[1,1] ~ 
-  N[2,1] ~
-  N[3,1] ~
-  N[4,1] ~
-  N[5,1] ~
-  
+  for (v in 1:5){
+  N[v,1] ~ dcat(pInit) 
+  }
   # Abundance for years >2
   for (t in 2:(nyr-1)){
   # Number of wild born juvs
@@ -127,10 +137,10 @@ run_ipm <- function(seed, datl, constl){
   } # t
   
   for (t in 1:nyr){
-  Ntot[t] <- sum(N[c(1,2,3,4,5),t]) + aug[t] # total number
+  Ntot[t] <- sum(N[c(1,2,3,4,5),t]) # total number
   NB[t] <- sum(N[c(4,5),t]) # number of breeders
   NF[t] <- sum(N[c(2,3),t])  # number of nonbreeders
-  NFY[t] <- N[1,t] #+ NH[t] # number of total first years. Includes translocated first years
+  NFY[t] <- N[1,t] # Includes translocated first years
   NFYW[t] <- N[1,t] # Number of wild born first years
   } # t
   
