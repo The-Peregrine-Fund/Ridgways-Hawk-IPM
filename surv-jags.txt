@@ -46,7 +46,7 @@ for (j in 1:p){ # coefficients
     sigma[j] ~ dnorm( 0, 1/(2*2) )T(0,)
     sigma2[j,j] <- sigma[j]*sigma[j]*rho[j,j]
     rho[j,j] <- 1
-    beta[j] ~ dnorm(0, 1/10*10)
+    beta[j] ~ dnorm( 0, 1/(2*2) )
   for (m in 1:4){ # population
     lmu[j,m] <- logit(mu[j,m])
     mu[j,m] ~ dbeta(1,1)
@@ -65,16 +65,16 @@ for (j in 1:p){ # coefficients
 for (i in 1:nind){
   for (t in 1:(nyr-1)){
     #Survival
-    logit(phiFY[i,t]) <- eps[1,t] + lmu[1, site[i,t]] + beta[1]*hacked[i]  # first year
-    logit(phiA[i,t]) <- eps[2,t] + lmu[2, site[i,t]] +  beta[2]*hacked[i] # nonbreeder
-    logit(phiB[i,t]) <- eps[3,t]  + lmu[3, site[i,t]] + beta[3]*hacked[i] # breeder
+    logit(phiFY[i,t]) <- eps[1,t] + lmu[1, site[i,t]] #+ beta[1]*hacked[i]  # first year
+    logit(phiA[i,t]) <- eps[2,t] + lmu[2, site[i,t]] #+  beta[2]*hacked[i] # nonbreeder
+    logit(phiB[i,t]) <- eps[3,t]  + lmu[3, site[i,t]] #+ beta[3]*hacked[i] # breeder
     #Recruitment
-    logit(psiFYB[i,t]) <- eps[4,t]  + lmu[4, site[i,t]] + beta[4]*hacked[i] # first year to breeder
-    logit(psiAB[i,t]) <- eps[5,t]  + lmu[5, site[i,t]] + beta[5]*hacked[i] # nonbreeder to breeder
-    logit(psiBA[i,t]) <- eps[6,t]  + lmu[6, site[i,t]] + beta[6]*hacked[i] # breeder to nonbreeder
+    logit(psiFYB[i,t]) <- eps[4,t]  + lmu[4, site[i,t]] #+ beta[4]*hacked[i] # first year to breeder
+    logit(psiAB[i,t]) <- eps[5,t]  + lmu[5, site[i,t]] #+ beta[5]*hacked[i] # nonbreeder to breeder
+    logit(psiBA[i,t]) <- eps[6,t]  + lmu[6, site[i,t]] #+ beta[6]*hacked[i] # breeder to nonbreeder
     #Re-encounter
-    logit(pA[i,t]) <- eps[7,t]  + lmu[7, site[i,t]] + beta[7]*hacked[i] # resight of nonbreeders
-    logit(pB[i,t]) <- eps[8,t]  + lmu[8, site[i,t]] + beta[8]*hacked[i] # resight of breeders
+    logit(pA[i,t]) <- eps[7,t]  + lmu[7, site[i,t]] #+ beta[7]*hacked[i] # resight of nonbreeders
+    logit(pB[i,t]) <- eps[8,t]  + lmu[8, site[i,t]] #+ beta[8]*hacked[i] # resight of breeders
   }#t
 }#i
 

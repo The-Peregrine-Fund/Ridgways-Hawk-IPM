@@ -23,12 +23,13 @@ library ('dplyr')
 library('ggplot2')
 library ('reshape2')
 
-dfl <- "data\\RIHA data 2011-2017.xlsx"
-df <- read_excel(dfl, sheet='individuals', na=c('#N/A', 'n/a','N/A', '', 'NA', '-') ) 
-
-df <- df[df$Stage!=0,]
-df$site[ df$site=="lHNP" ] <- "LHNP"
+dfl <- "data\\RIHA data 2011-2023.xlsx"
+df <- read_excel(dfl, sheet='Individuals', na=c('#N/A', 'n/a','N/A', '', 'NA', '-') ) 
+df$year.resighted <- as.numeric(df$year.resighted)
+df$origin[ df$origin=="lHNP" ] <- "LHNP"
 df <- df[df$sex=="Female",]
+df <- df[df$current.population!="AV",] # remove because small sample size
+
 # Reassign bands to abbreviate
 df$right.color[df$right.color=="Not recorded"] <- "NR"
 df$right.color[df$right.color=="No band"] <- "NB"
@@ -42,7 +43,7 @@ df$ID <- paste(df$l.code, df$r.code,
                df$`left.color`, df$`right.color`, sep="-")
 
 # omit data for those lacking
-df <- df[ !is.na(df$site), ]
+df <- df[ !is.na(df$current.population), ]
 
 # separate marked and unmarked birds
 not.banded <- c("NB-NB-NB-NB", "NB-NR-NB-NR", "NR-NR-NR-NR")
@@ -61,11 +62,11 @@ df.marked.max <- df.marked %>%
 #* 2. Extract counts 
 #**********************
 # 'B NB N' - 0= Not seen, 1= Nestling, 2=Nonbreeder, 3= Breeder
-counts.marked <- table(df.marked.max$Stage, df.marked.max$year.resighted, df.marked.max$site)
+counts.marked <- table(df.marked.max$Stage, df.marked.max$year.resighted, df.marked.max$current.population)
 
-counts.unmarked <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$site)
+counts.unmarked <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$current.population)
 dimnames(counts.marked)[[1]] <- c('nestling', 'nonbreeder', 'breeder')
-#dimnames(counts.unmarked)[[1]] <- dimnames(counts.marked)[[1]] <- c('not seen', 'nestling', 'nonbreeder', 'breeder')
+dimnames(counts.unmarked)[[1]] <- c('nonbreeder', 'breeder')
 
 #**********************
 #* 3. Territory occupancy 
@@ -137,23 +138,23 @@ z <- array(NA, dim = dim(y), dimnames=dimnames(y))
 z[] <- ifelse(y %in% c(2,3), y, NA)
 
 # site covariate 
-site <- tapply(as.numeric(factor(dfm$site)), 
+pop <- tapply(as.numeric(factor(dfm$current.population)), 
               list(dfm$ID, dfm$year.resighted), 
             max,  na.rm=T, default=NA)
-site[site=='-Inf'] <- NA
+pop[pop=='-Inf'] <- NA
 # fill in NAs during unobserved years
 for (i in 1:nind){
-  vals <- which( !is.na(site[i,]) )
-  novals <- which( is.na(site[i,]) )
+  vals <- which( !is.na(pop[i,]) )
+  novals <- which( is.na(pop[i,]) )
   if (length(novals)==0) { next } else{
   for (j in 1:length(novals) ){
     min.val <-  vals[ which.min(vals-novals[j]) ]
     max.val <-  vals[ which.max(vals-novals[j]) ]
     if (novals[j] < max.val){
     # which value is nearest in time
-    site[ i, novals[j] ] <- site[i,min.val] 
+    pop[ i, novals[j] ] <- pop[i,min.val] 
     } else {
-      site[ i, novals[j] ] <- site[i, max.val]
+      pop[ i, novals[j] ] <- pop[i, max.val]
     } # else
   } # j
   } # else
@@ -171,7 +172,7 @@ lst <- apply(y, 1, lastfun)
 lst <- ifelse(lst=="Inf" | lst=="-Inf", nyr, lst)
 
 age2 <- age <- array(NA, dim=c(nind, nyr),
-             dimnames=list(ind.nu, 2011:2017 ))
+             dimnames=list(ind.nu, fyr:lyr ))
 # set ages for first year of detection
 for (i in 1:nind){
   if(y[i, frst[i]]==1){
@@ -209,21 +210,64 @@ ggplot(mage, aes(fill=Age, y=as.numeric(Age), x=Year)) +
   ylab("Proportion of population")
 
 #**********************
+#* reassign stages to 
+#* include SY stage
+#**********************
+y2 <- y
+y2[y2==4] <- 6 # not seen becomes state 6
+y2[y2==3] <- 5 # breeder becomes 5
+y2[y2==2] <- 4 # nonbreeder becomes 4
+
+# age==1 then reassign as FY
+y2[age==1 & y==2] <- 2 # FY nonbrreder 
+y2[age==1 & y==3] <- 3 # FY breeder
+
+# not many FYs documented
+table(y2)
+
+# Need to do the same to zs
+# NEEDS WORK
+z2 <-  z   
+
+#**********************
 #* 7. Productivity data ----
 #**********************
-dflp <- "data\\RIHA data 2011-2017.xlsx"
-dfp <- read_excel(dfl, sheet='nesting.summary', na=c('#N/A', 'n/a','N/A', '', 'NA', '-', "NR") ) # live/dead tibble
-# omit "NO ID"s
-dfp <- dfp[substr(dfp$Territory_number , 1, 5)!="No ID", ]
-# omit NAs
-dfp <- dfp[!is.na(dfp$Fledged ), ]
-fl <- tapply(dfp$Fledged, list(dfp$Territory_number, dfp$Year), sum, na.rm=T)
-colMeans(fl, na.rm=T)
-prod.nestingdata <- colSums(fl, na.rm=T)
-
 # Productivity from mark resight data
 # Stage=1 is a nestling
-prod.individdata <- colSums(y==1)
+df$prod <- ifelse(df$Stage==1, 1, 
+                  ifelse(df$Stage==3, 0, NA))
+prod <- tapply(df$prod, list(df$territory.name, df$year.resighted), sum, na.rm=TRUE)
+table(prod)
+
+df$group <- ifelse(df$group=="NR", NA, as.numeric(df$group) )
+levels(factor(df$group))
+treat <- tapply(df$group, list(df$territory.name, df$year.resighted), max, na.rm=TRUE)
+treat <- ifelse(treat==3, 1, ifelse(treat==1,0,NA))
+
+# make long form to speed up bc many NAs
+lprod <- melt(prod)
+ltreat <- melt(treat)
+lp <- merge(lprod, ltreat, by=c("Var1", "Var2"))
+colnames(lp) <- c("ter","year", "fledged", "treat")
+lp <- lp[!is.na(lp$fledged) & !is.na(lp$treat),]
+
+lp$nestsuccess <- ifelse(lp$fledged>0, 1, 0) 
+lp$brood <- ifelse(lp$fledged>0, lp$fledged, NA)
+lp$year2 <- lp$year-(min(lp$year)-1)
+
+lb <- lp[!is.na(lp$brood),]
+
+brood.end <- table(lb$year2)
+yrind.brood <- array(NA, dim = c(max(brood.end), nyr) )
+for (t in 1:nyr){
+  yrind.brood[1:brood.end[t],t] <- which(lb$year2==t)
+}
+
+nest.end <- table(lp$year2)
+yrind.nest <- array(NA, dim = c(max(nest.end), nyr) )
+for (t in 1:nyr){
+  yrind.nest[1:nest.end[t],t] <- which(lp$year2==t)
+}
 
 #**********************
 #* 8. Hacked birds ----
@@ -240,26 +284,15 @@ prod.individdata <- colSums(y==1)
 # ie no immigration or emigration
 # Fostered birds will matter because they will directly influence 
 # productivity overall
-hacked <- tapply(dfp$Hacking, list(dfp$Year), sum, na.rm=T)
-
 # or try individual data for comparison
-df.hacked <- df[df$history %in% c("HPC", "HPS"),]
-hacked.to <- tapply(df.hacked$BID, list(df.hacked$year.resighted, df.hacked$site), length, default=0)
-hacked.from <- tapply(df.hacked$BID, list(df.hacked$year.resighted, df.hacked$history), length, default=0)
+df.hacked <- df[df$history == "Hack",]
+hacked.to <- tapply(df.hacked$BID, list(df.hacked$year.resighted, df.hacked$current.population), length, default=0)
+hacked.from <- tapply(df.hacked$BID, list(df.hacked$year.resighted, df.hacked$origin), length, default=0)
 
-# compare nesting data and individual data 
-hacked.comp <- data.frame(nesting.dat = hacked,
-           individ.to = rowSums(hacked.to),
-           individ.from = rowSums(hacked.from)) |> print()
+# compare individual data 
+data.frame(hacked.to, hacked.from)
 
-plot(rownames(hacked), hacked, type="l")
-lines(names(rowSums(hacked.to)), rowSums(hacked.to), lty=2)
-lines(names(rowSums(hacked.from)), rowSums(hacked.from), lty=3)
-
-# individ.to is missing 2 values for site hence individ discrepancy btw to and from
-df.hacked$ID[is.na(df.hacked$site)]
-
-#created a hacked or not hacked covariate for each individual
+#create a hacked or not hacked covariate for each individual
 hacked.cov.survival <- ifelse(rownames(y) %in% df.hacked$ID, "hacked", "wild") |>
   factor(levels=c("wild","hacked"))
 names(hacked.cov.survival) <-  rownames(y)
@@ -269,8 +302,7 @@ names(hacked.cov.survival) <-  rownames(y)
 #**********************
 #* Brought from los haistes to puntacana
 #* only one bird for now
-#* 
-df.fostered <- df[df$history =="FPC",]
+df.foster <- df[df$history =="Foster",]
 
 #**********************
 #* 8. Covariates ----
@@ -289,36 +321,43 @@ tr <- factor(dfp$tr, levels=c(1,0))
 
 mm1 <- model.matrix(dfp$Fledged ~ tr, contrasts.arg = list(tr='contr.sum'))
 
-
 #**********************
 #* 9. Data list for analysis ----
 #**********************
 datl <- list( # productivity data
-              f = dfp$Fledged,
+              brood = lb$brood,
+              nest.success = lp$nestsuccess,
               # survival data
               y = y,
               z = z, 
               # count data
               countFYW = counts.marked[1,,1],
               countA = counts.marked[2,,1], # counts.marked[stage, year, sex]
-              countB = counts.marked[3,,1]
+              countB = counts.marked[3,,1],
+              counts.unmarked = apply(counts.unmarked, c(1,2), sum),
+              counts.marked = apply(counts.marked, c(1,2), sum)
               )
 
 constl <- list( # survival 
                 first = frst, 
-                hacked =  as.numeric(hacked.cov.survival)-1, # 1 = wild, 2 = hacked
+                #hacked =  as.numeric(hacked.cov.survival)-1, # 1 = wild, 2 = hacked
                 nind = nind,
                 nyr = nyr,
-                site = site, 
+                site = pop, 
                 # productivity 
-                nyr = nyr
-                # K = nrow(dfp),
-                # year = as.numeric(factor(dfp$Year)), 
-                # nest.treat = tr, # or as.numeric(tr) to index
-                # nest.treat.centered = mm1[,2],
+                
+                treat.brood = lb$treat,
+                nbrood = nrow(lb),
+                year.brood = lb$year2, 
+                yrind.brood = yrind.brood,
+                brood.end = brood.end,
+                
+                treat.nest = lp$treat,
+                nnest = nrow(lp),
+                year.nest = lp$year2,
+                yrind.nest = yrind.nest,
+                nest.end = nest.end,
                 # #fostered = , # number fostered
-                # num_transl = mm1[,2], # translocated as sum-to-zero contrast, -1=not treated, 1=treated
                 # #pop_f = as.numeric(factor(dfp$site)),
-                # hacked = transl_centered_scaled
 )
 save(datl, constl, file="data\\data.rdata")

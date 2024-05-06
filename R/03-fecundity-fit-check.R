@@ -15,6 +15,8 @@ constl <- list( nyr = nyr,
                 tr = dfp$tr
 )
 
+
+
 run_p <- function(seed, datl, constl){
   library('nimble')
   library('coda')
