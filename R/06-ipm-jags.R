@@ -1,16 +1,16 @@
-## ---- ipm1 --------
-#################################
-# The model
-################################
-library('nimble')
-#library('MCMCvis')
-library('parallel')
-library ('coda')
-load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
-#load("data/data.rdata")
+################
+# JAGS version
+###############
+setwd("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\GitHub\\Ridgways-Hawk-IPM\\")
+load("data\\data.rdata")
+library (jagsUI)
+#load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
 
-mycode <- nimbleCode(
-  {
+m<- c("ipm-jags")
+modfl <- paste("./", m, ".txt", sep="")
+sink(modfl)
+cat("
+    model{
     ####################################################
     ####################################################
     # Mark-resight-recovery data
@@ -38,27 +38,7 @@ mycode <- nimbleCode(
     #   pFY: resight probability first-years
     #   pA: resight probability nonbreeders
     #   pB: resight probability breeders
-    ###################################################
-    # Priors and constraints
-    ###################################################
-    # survival, recruitment, and detection can be correlated
-    for (j in 1:8){ 
-        betas[j] ~ dunif(-5, 5)  # prior for coefficients
-        lmus[j] <- logit(mus[j])
-        mus[j] ~ dbeta(1,1) # prior for means
-      }     # m population #s sex #h hacked 
-    
-    # estimated using the multivariate normal distribution
-    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.0, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # multivariate normal for temporal variance
-    for (t in 1:(nyr-1)){
-      eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-                          cholesky = U[1:p, 1:p], prec_param = 0)
-    }
-    for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
-    
+   
     #######################
     # Derived params
     #######################
@@ -71,7 +51,7 @@ mycode <- nimbleCode(
     # Likelihood for fecundity
     ###############################
     # Priors for number of fledglings
-    lmu.brood ~ dnorm(0, sd=5)
+    lmu.brood ~ dnorm(0, 1/(5*5))
     delta ~ dunif(-5, 5)
     sig.brood ~ dexp(1)
     sig.brood.t ~ dexp(1)
@@ -85,7 +65,7 @@ mycode <- nimbleCode(
     # Two models for fecundity, (1) brood size and (2) nest success  
     # Brood size
     for (k in 1:nbrood){
-      brood[k] ~ dlnorm(lam[k], sdlog=sig.brood) # truncating seems to break something
+      brood[k] ~ dlnorm(lam[k], 1/(sig.brood*sig.brood) ) # truncating seems to break something
       lam[k] <- lmu.brood +
                 delta*treat.brood[k] +
                 eps.brood[year.brood[k] ]
@@ -98,8 +78,8 @@ mycode <- nimbleCode(
                       eps.nest[year.nest[n] ]
     } # n 
     for ( t in 1:nyr){
-      eps.brood[t] ~ dnorm(0, sd=sig.brood.t)
-      eps.nest[t] ~ dnorm(0, sd=sig.nest)
+      eps.brood[t] ~ dnorm(0, 1/(sig.brood.t*sig.brood.t) )
+      eps.nest[t] ~ dnorm(0, 1/(sig.nest*sig.nest) )
     } # t
     # summarize yearly brood size for population model
     # accounts for nest treatments
@@ -119,7 +99,7 @@ mycode <- nimbleCode(
     for (k in 1:nbrood){
       f.obs[k] <- brood[k] # observed counts
       f.exp[k] <- lam[k] # expected counts adult breeder
-      f.rep[k] ~ dlnorm(lam[k], sdlog=sig.brood) # expected counts
+      f.rep[k] ~ dlnorm(lam[k], 1/(sig.brood*sig.brood) ) # expected counts
       f.dssm.obs[k] <- abs( ( f.obs[k] - f.exp[k] ) / (f.obs[k]+0.001) )
       f.dssm.rep[k] <- abs( ( f.rep[k] - f.exp[k] ) / (f.rep[k]+0.001) )
     } # k
@@ -131,7 +111,7 @@ mycode <- nimbleCode(
     ################################
     # Likelihood for counts
     ################################
-    # Abundance for year=1
+    # # Abundance for year=1
     for (v in 1:7){
       N[v,1] ~ dcat(pInit[1:88])
     }
@@ -140,9 +120,8 @@ mycode <- nimbleCode(
       # Number of wild born juvs
       N[1, t+1] ~ dpois( (NFY[t]*eta.phiFY[t]*eta.psiFYB[t] + # first year breeders
                           NF[t]*eta.phiA[t]*eta.psiAB[t] + # nonbreeders to breeders
-                             NB[t]*eta.phiB[t]*(1-eta.psiBA[t])) # breeders remaining
-                           *mn.f[t] ) # end Poisson
-
+                          NB[t]*eta.phiB[t]*(1-eta.psiBA[t])) # breeders remaining
+                           *mn.f[t+1] ) # end Poisson
       # Abundance of nonbreeders
       ## Second year nonbreeders
       N[2, t+1] ~ dbin(eta.phiFY[t]*(1-eta.psiFYB[t]), NFY[t]) # Nestlings to second year nonbreeders
@@ -164,14 +143,26 @@ mycode <- nimbleCode(
       Ntot[t] <- sum(N[1:7, t]) # total number
     } # t
     
-    # Observation process    
+    # Observation process  
+    # sig.NFY ~ dexp(1)
+    # sig.NF ~ dexp(1)
+    # sig.NB ~ dexp(1)
+    
     for (t in 1:nyr){
+      # counts.marked[1, t] ~ dnorm(NFY[t], 1/(sig.NFY*sig.NFY) ) # first year males, includes translocated/hacked
+      # counts.marked[2, t] ~ dnorm(NF[t], 1/(sig.NF*sig.NF) ) # nonbreeding adult males 
+      # counts.marked[3, t] ~ dnorm(NB[t], 1/(sig.NB*sig.NB) ) # breeding males 
+      
       counts.marked[1, t] ~ dpois(NFY[t]) # first year males, includes translocated/hacked
       counts.marked[2, t] ~ dpois(NF[t]) # nonbreeding adult males 
       counts.marked[3, t] ~ dpois(NB[t]) # breeding males 
-      # log(NFY[t]) ~ dnorm(0, sd=5)
-      # log(NF[t]) ~ dnorm(0, sd=5)
-      # log(NB[t]) ~ dnorm(0, sd=5)
+      
+      # log(NFY[t]) <- lNFY[t]
+      # lNFY[t] ~ dnorm( 0, 1/(5*5) )
+      # log(NF[t]) <- lNF[t]
+      # lNF[t] ~ dnorm( 0, 1/(5*5) )
+      # log(NB[t]) <- lNB[t]
+      # lNB[t] ~ dnorm( 0, 1/(5*5) )
     } # t
     
     ###################
@@ -258,19 +249,43 @@ mycode <- nimbleCode(
       eta.pB[t] <- mean(pB[1:nind,t])
     } # t
     
+    # multivariate normal for temporal variance
+  for (t in 1:nyr){
+    eps[1:p,t] ~ dmnorm.vcov(mu.zeroes[1:p], sigma2[1:p, 1:p])
+  }
+
+# priors and diagonals
+for (j in 1:p){ # coefficients
+    sigma[j] ~ dexp(1)
+    sigma2[j,j] <- sigma[j]*sigma[j]*rho[j,j]
+    rho[j,j] <- 1
+    #betas[j] ~ dnorm( 0, 1/(2*2) )
+    lmus[j] <- logit(mus[j])
+    mus[j] ~ dbeta(1,1)
+  } # j
+
+# upper diagonal  
+  for (j in 1:(p-1)){
+    for (k in (j+1):p){
+      sigma2[j,k] <- sigma[j] * sigma[k] * rho[j,k] 
+      sigma2[k,j] <- sigma2[j,k]
+      rho[j,k] ~ dunif(-1,1)
+      rho[k,j] <- rho[j,k]
+    }}
+  
     for (i in 1:nind){
       for (t in 1:(nyr-1)){
         #Survival
-        logit(phiFY[i,t]) <- eps[1,t] + lmus[1] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eps[2,t] + lmus[2] +  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eps[3,t]  + lmus[3] + betas[3]*hacked[i] # breeder
+        logit(phiFY[i,t]) <- eps[1,t] + lmus[1] #+ betas[1]*hacked[i]  # first year
+        logit(phiA[i,t]) <- eps[2,t] + lmus[2] #+  betas[2]*hacked[i] # nonbreeder
+        logit(phiB[i,t]) <- eps[3,t]  + lmus[3] #+ betas[3]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eps[4,t] + lmus[4] + betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eps[5,t] + lmus[5] + betas[5]*hacked[i] # nonbreeder to breeder
-        logit(psiBA[i,t]) <- eps[6,t] + lmus[6] + betas[6]*hacked[i] # breeder to nonbreeder
+        logit(psiFYB[i,t]) <- eps[4,t] + lmus[4] #+ betas[4]*hacked[i] # first year to breeder
+        logit(psiAB[i,t]) <- eps[5,t] + lmus[5] #+ betas[5]*hacked[i] # nonbreeder to breeder
+        logit(psiBA[i,t]) <- eps[6,t] + lmus[6] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eps[7,t] + lmus[7] + betas[7]*hacked[i] # resight of nonbreeders
-        logit(pB[i,t]) <- eps[8,t] + lmus[8] + betas[8]*hacked[i] # resight of breeders
+        logit(pA[i,t]) <- eps[7,t] + lmus[7] #+ betas[7]*hacked[i] # resight of nonbreeders
+        logit(pB[i,t]) <- eps[8,t] + lmus[8] #+ betas[8]*hacked[i] # resight of breeders
       }#t
     }#i
     
@@ -332,86 +347,104 @@ mycode <- nimbleCode(
         y[i,t] ~ dcat(po[z[i,t], i, t-1, 1:4])
       } #t
     } #i
-  } )
+} # model
+",fill = TRUE)
+sink() 
 
-run_ipm <- function(info, datl, constl, code){
-  library('nimble')
-  library('coda')
-  # helper function for multivariate normal
-  uppertri_mult_diag <- nimbleFunction(
-    run = function(mat = double(2), vec = double(1)) {
-      returnType(double(2))
-      p <- length(vec)
-      out <- matrix(nrow = p, ncol = p, init = FALSE)
-      for(i in 1:p){
-        out[ ,i] <- mat[ ,i] * vec[i]
-      }
-      return(out)
-    })
-  assign('uppertri_mult_diag', uppertri_mult_diag, envir = .GlobalEnv)
-  
-params <- c(# pop growth 
-            # "lambda",
-            # fecundity
-            "lmu.brood", "delta", "sig.brood", "sig.brood.t",
-            "lmu.nest", "mu.nest", "gamma", "sig.nest",
-            "mn.brood", "mn.nest", "mn.f", 
-             # survival 
-             "mus", "lmus", "betas",
-             # abundance
-             "NB", "NF", "NFY", "N", "Ntot",
-             # error terms
-             "eps", "sds", "Ustar", "U", "R",
-             # yearly summaries
-             'eta.phiFY', 'eta.phiA', 'eta.phiB',
-             'eta.psiFYB', 'eta.psiAB', 'eta.psiBA',
-             'eta.pA', 'eta.pB'
-             # goodness of fit
-            # "f.dmape.obs", "f.dmape.rep",
-            # "f.tvm.obs", "f.tvm.rep",
-             # "dmape.obs", "dmape.rep", 
-             # "tvm.obs", "tvm.rep",
-             # "tturn.obs", "tturn.rep",
+n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
+n.chains=3; n.thin=5; n.iter=10000; n.burnin=5000; n.adapt=1000
+n.chains=1; n.thin=1; n.iter=200; n.burnin=100
+
+pars <- c(# pop growth 
+  #"lambda",
+  # fecundity
+  "lmu.brood", "delta", "sig.brood", 
+  "lmu.nest", "mu.nest", "gamma", 
+  "sig.brood.t", "sig.nest",
+  "mn.brood", "mn.nest", "mn.f", 
+  #"lam", 
+  # survival 
+  "mus", "lmus", 
+  # abundance
+  "N", "NB", "NF", "NFY", "Ntot",
+  # error terms
+  "sigma2", "sigma", "rho",
+  # yearly summaries
+  'eta.phiFY', 'eta.phiA', 'eta.phiB',
+  'eta.psiNB', 'eta.psiAB', 'eta.psiBA',
+  'eta.pA', 'eta.pB',
+  # goodness of fit
+  # "dmape.obs", "dmape.rep", 
+  # "tvm.obs", "tvm.rep",
+  # "tturn.obs", "tturn.rep",
+  "f.dmape.obs", "f.dmape.rep",
+  "f.tvm.obs", "f.tvm.rep"
 )
 
-#n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-n.chains=1; n.thin=10; n.iter=20000; n.burnin=10000
-#n.chains=1; n.thin=1; n.iter=200; n.burnin=100
+datl <- c(datl, constl)
+# create initial values for y data
+get.first <- function(x) min(which(x!=4), na.rm=T)
+f <- apply(datl$y, 1, get.first)
+get.last <- function(x) max(which(x!=4), na.rm=T)
+l <- apply(datl$y, 1, get.last)
 
-mod <- nimbleModel(code, calculate=T, 
-                   constants = constl, 
-                   data = datl, 
-                   inits = info$inits, 
-                   buildDerivs = FALSE) # doesn't work when TRUE, no hope for HMC
+z.inits <- array(NA, dim=dim(datl$y), dimnames=dimnames(datl$y))
+for (i in 1:constl$nind){
+  if(l[i]==constl$nyr) { next } else{ 
+    z.inits[i, (l[i]+1):constl$nyr] <- 4 }}
 
-mod$simulate() 
-cmod <- compileNimble(mod)
-confhmc <- configureMCMC(mod)
-confhmc$setMonitors(params)
-hmc <- buildMCMC(confhmc)
-chmc <- compileNimble(hmc, project = mod, resetFunctions = TRUE)
+TFmat <- is.na(z.inits) & is.na(z)
+for (i in 1:nrow(TFmat) ){  TFmat[i,1:f[i]] <- FALSE }
 
-post <- runMCMC(chmc,
-                niter = n.iter, 
-                nburnin = n.burnin,
-                nchains = n.chains,
-                thin = n.thin,
-                samplesAsCodaMCMC = T, 
-                setSeed = info$seed)
+# we just want the 2s and 3s
+suby <- array(NA, dim(datl$y))
+suby[datl$y %in% c(2,3)] <- datl$y[datl$y %in% c(2,3)]
+for (i in 1:nrow(z.inits) ){
+  for (t in f[i]:ncol(z.inits) ){
+    mx <- ifelse( max(suby[i,1:t], na.rm=T)=="-Inf", 2, max(suby[i,1:t], na.rm=T))
+    if (TFmat[i,t]==TRUE & mx==2){
+      z.inits[i,t] <- 2 }
+    if (TFmat[i,t]==TRUE & mx==3){
+      z.inits[i,t] <- mx }
+  }}
 
-return(post)
-} # run_ipm function end
+# create inits for rhos
+z.inits[ z %in% c(2,3) ] <- z[ z %in% c(2,3) ]
+z.inits [datl$y %in% c(2,3)] <- NA
 
-this_cluster <- makeCluster(4)
-post <- parLapply(cl = this_cluster, 
-                  X = par_info, 
-                  fun = run_ipm, 
-                  datl = datl, 
-                  constl = constl, 
-                  code = mycode)
-stopCluster(this_cluster)
+# Abundance
+N <- array(NA, dim=c(7, constl$nyr) )
+#N[] <- 0
+N[1,] <- datl$counts.marked[1,]
+# N[2,] <- round(datl$counts.marked[2,]/2)
+# N[3,] <- round(datl$counts.marked[2,]/2)
+N[4,] <- 0
+# N[5,] <- round(datl$counts.marked[3,]/3)
+# N[6,] <- round(datl$counts.marked[3,]/3)
+# N[7,] <- round(datl$counts.marked[3,]/3)
 
-save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm-simp.rdata")
+inits.func <- function(){
+  list(z = z.inits, 
+       sigma = runif(p)#,
+       #N = N)
+)}
+
+datl$z <- z
+for (i in 1:datl$nind){
+  datl$z[i,1:f[i]] <- NA
+}
+
+out <- jags( datl, 
+            inits= inits.func,
+            pars, modfl,  
+            n.chains = n.chains, n.thin = n.thin, 
+            n.burnin = n.burnin, n.adapt=n.adapt, n.iter=n.iter, 
+            parallel=T, module=c("glm", "bugs"))
+
+save(out,  
+     file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-jags.Rdata")
+
 #save(post,  
 #     file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm.Rdata")
+
+#save(file=paste("./", m, ".Rdata", sep=""), list="out")

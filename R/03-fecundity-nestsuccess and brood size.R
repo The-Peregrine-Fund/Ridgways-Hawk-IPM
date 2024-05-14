@@ -34,9 +34,9 @@ run_f <- function(seed, datl, constl){
   code <- nimbleCode(
     {
       # Priors for fecundity
-      lmu.brood ~ T(dnorm(0, sd=10), log(mintrunc), log(maxtrunc))
+      #lmu.brood ~ T(dnorm(0, sd=10), log(mintrunc), log(maxtrunc))
       #lmu.brood ~ T(dnorm(0, sd=10), mintrunc, maxtrunc)
-      #lmu.brood ~ dnorm(0, sd=10)
+      lmu.brood ~ dnorm(0, sd=10)
       
       delta ~ dunif(-5, 5)
       gamma ~ dunif(-5, 5)
@@ -131,8 +131,8 @@ run_f <- function(seed, datl, constl){
   mod$calculate()
   
   cmod <- compileNimble(mod)
-  confhmc <- configureMCMC(mod)
-  #confhmc <- configureHMC(mod)
+  #confhmc <- configureMCMC(mod)
+  confhmc <- configureHMC(mod)
   
   confhmc$setMonitors(params)
   hmc <- buildMCMC(confhmc)
@@ -191,15 +191,23 @@ apply(out$mn.f, 1, mean)
 # Fledging rate of 0.64 fledglings per 
 # active nest (fledgling nest -1 )
 dataest <- tapply(lp$fledged, lp$year2, mean)
-modelest1 <- apply(out$mn.brood, 1, mean)
-modelest2 <- apply(out$mn.nest, 1, mean)
+#modelest1 <- apply(out$mn.brood, 1, mean)
+#modelest2 <- apply(out$mn.nest, 1, mean)
 modelest3 <- apply(out$mn.f, 1, mean)
 par(mfrow=c(1,1))
 plot(2011:2023, dataest, type="l", 
      ylim=c(0.1,0.6), 
      xlab="Year", ylab="Fledglings per nest")
-lines(2011:2023, modelest1*modelest2, lty=2)
-lines(2011:2023, modelest1*modelest2, lty=3)
+#lines(2011:2023, modelest1*modelest2, lty=2)
+lines(2011:2023, modelest3, lty=3)
+
+
+proptr <- tapply(constl$treat.nest, constl$year.nest, mean)
+plot(2011:2023, proptr, type="l",
+     ylab="Prop of nests treated", xlab="Year")
+numnests <- tapply(datl$nest.success, constl$year.nest, length)
+plot(2011:2023, numnests, type="l",
+     ylab="Num of nests monitored", xlab="Year")
 
 # check fit
 plot.diag <- function(out, ratio=FALSE, lab=""){
@@ -231,6 +239,7 @@ plot.diag <- function(out, ratio=FALSE, lab=""){
   }
   return(list('Bayesian p-value'=bp1))
 }
+
 
 plot.diag(post, ratio=T, lab="Poisson")
 plot.diag(post, ratio=F, lab="log-Normal")
