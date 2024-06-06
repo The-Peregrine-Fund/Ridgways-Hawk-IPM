@@ -409,7 +409,6 @@ datl <- list( # productivity data
 
 constl <- list( # survival 
                 first = frst, 
-                #hacked =  as.numeric(hacked.cov.survival)-1, # 1 = wild, 2 = hacked
                 nind = nind,
                 nyr = nyr,
                 site = pop, 
@@ -658,7 +657,7 @@ save(datl, constl, par_info, inits.func, z,
 # Check count data
 colSums(counts.marked[2:3,,1]) + colSums(counts.marked[2:3,,1])
 colSums(counts.marked[2:3,,2]) + colSums(counts.marked[2:3,,2])
-colSums(counts.marked[2:3,,3]) + colSums(counts.marked[2:3,,3])
+#colSums(counts.marked[2:3,,3]) + colSums(counts.marked[2:3,,3])
 colSums(table(df$ID, df$year.resighted))
 
 # Check survival data

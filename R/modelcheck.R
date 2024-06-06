@@ -1,5 +1,5 @@
 #### ---- catplots -------
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites_nb.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -123,10 +123,10 @@ for (i in 1:(nrow(outp$R)-1)){
   }}
 par(mfrow=c(2,1))
 plt(object=out, params=Rs, exact=TRUE, ISB=FALSE, 
-    main="Temporal correlations\namong sites",
+    main="Correlations btw demographic rates\n over time\n also called synchrony",
     xlab = "Rhos", guide_lines=TRUE)
 plt(object=out, params=R2s, exact=TRUE, ISB=FALSE, 
-    main="Site-temporal correlations",
+    main="Correlations btw demographic rates\n over time and sites",
     xlab = "Rhos", guide_lines=TRUE)
 # lmu.brood = mean brood size (log scale), 
 # sig.brood = SD among nests
@@ -259,7 +259,7 @@ MCMCtrace(post, pdf=FALSE, params= "gamma")
 
 #### ---- fit ------
 # Goodness of fit check
-plot.diag <- function(out, ratio=FALSE, 
+fit.check <- function(out, ratio=FALSE, 
                       name.rep="f.dmape.rep", 
                       name.obs="f.dmape.obs",
                       jit=100,
@@ -298,13 +298,13 @@ plot.diag <- function(out, ratio=FALSE,
 
 # check goodness-of-fit for brood size
 # breeder, ind=1
-plot.diag(out, ratio=F,
+fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=1,
           lab="binomial", jit=300)
 # nonbreeder, ind=2
-plot.diag(out, ratio=F,
+fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=2,
@@ -312,9 +312,9 @@ plot.diag(out, ratio=F,
 # first-year, ind=3
 # poisson failed fit test bp=0
 # Currently running models to try and fix
-plot.diag(out, ratio=T,
+fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=3,
-          lab="Poisson", jit=300)
+          lab="Neg binomial", jit=300)
 

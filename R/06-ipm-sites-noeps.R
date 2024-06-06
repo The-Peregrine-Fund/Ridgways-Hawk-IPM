@@ -49,16 +49,16 @@ mycode <- nimbleCode(
       }}     # m population #s sex #h hacked 
     
     # Temporal random effects and correlations among all sites
-    # for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
-    # # estimated using the multivariate normal distribution
-    # R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    # Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.3, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    # U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # # multivariate normal for temporal variance
-    # for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
-    #   eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-    #                       cholesky = U[1:p, 1:p], prec_param = 0)
-    # }
+    for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
+    # estimated using the multivariate normal distribution
+    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
+    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.3, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
+    U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
+    # multivariate normal for temporal variance
+    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
+      eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
+                          cholesky = U[1:p, 1:p], prec_param = 0)
+    }
 
     # Temporal random effects and correlations between sites
     for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation
@@ -102,14 +102,16 @@ mycode <- nimbleCode(
       brood[k] ~ dlnorm(lam[k], sdlog=sig.brood) # truncating seems to break something
       lam[k] <- lmu.brood[site.brood[k]] +
                 delta*treat.brood[k] +
-                eps[9, year.brood[k] ] + eta[9, site.brood[k], year.brood[k] ]
+                eps[9, year.brood[k] ] + 
+                eta[9, site.brood[k], year.brood[k] ]
     } # k
     # Nest success       
     for (n in 1:nnest){
       nest.success[n] ~ dbern( nu[n] )
       logit(nu[n]) <- lmu.nest[site.nest[n]] + 
                       gamma*treat.nest[n] + 
-                      eps[10, year.nest[n] ] + eta[10, site.nest[n], year.nest[n] ]
+                      eps[10, year.nest[n] ] + 
+                      eta[10, site.nest[n], year.nest[n] ]
     } # n 
     # derive yearly brood size for population model
     for (t in 1:nyr){
@@ -144,7 +146,7 @@ mycode <- nimbleCode(
     # Abundance for year=1
     for (v in 1:7){ 
       for (s in 1:nsite){
-      # subtract one because dcat can't be zero
+      # subtract one because to allow dcat to include zero
       N[v, 1, s] <- N2[v, 1, s] - 1 
       N2[v, 1, s] ~ dcat(pPrior[1:s.end[s], s]) 
         }} # s t
@@ -259,7 +261,7 @@ mycode <- nimbleCode(
     # Likelihood for survival
     ################################ 
     # Calculate an averages for sites
-    # each year 
+    # each year for integration
     for (t in 1:nyr){
       for (s in 1:nsite){
         for (xxxx in 1:surv.end[t,s]){
@@ -299,8 +301,8 @@ mycode <- nimbleCode(
                               lmus[4, site[i,t]] + betas[4]*hacked[i] # first year to breeder
         logit(psiAB[i,t]) <- eta[5, site[i,t],t] + eps[5,t] + 
                               lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
-        logit(psiBA[i,t]) <- eta[6, site[i,t],t] + eps[6,t] + 
-                              lmus[6, site[i,t]] + betas[6]*hacked[i] # breeder to nonbreeder
+        logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
+                              lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
         logit(pA[i,t]) <- eta[7, site[i,t],t] + eps[7,t] + 
                               lmus[7, site[i,t]] + betas[7]*hacked[i] # resight of nonbreeders
@@ -412,9 +414,9 @@ params <- c(# pop growth
              "tturn.obs", "tturn.rep"
 )
 
-# n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
+n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
 #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-n.chains=1; n.thin=10; n.iter=20000; n.burnin=10000
+#n.chains=1; n.thin=10; n.iter=20000; n.burnin=10000
 # n.chains=1; n.thin=1; n.iter=200; n.burnin=100
 
 mod <- nimbleModel(code, 
@@ -455,7 +457,7 @@ post <- parLapply(cl = this_cluster,
 stopCluster(this_cluster)
 
 save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_sites_hmc.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_sites.rdata")
 
 # save(post,  
 #      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-sites.Rdata")
