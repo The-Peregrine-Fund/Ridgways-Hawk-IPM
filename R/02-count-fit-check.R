@@ -506,6 +506,7 @@ save(postB, postNB, postFY, funcs,
      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\GOF.Rdata")
 
 # ---- PPCfunction --------
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\GOF.Rdata")
 # Function for posterior predictive checks
 # to assess goodness-of-fit
 plot.diag <- function(out, ratio=FALSE, lab=""){

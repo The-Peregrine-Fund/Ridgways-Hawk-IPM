@@ -52,7 +52,7 @@ mycode <- nimbleCode(
     for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
     # estimated using the multivariate normal distribution
     R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.3, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
+    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
     U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
     # multivariate normal for temporal variance
     for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
@@ -64,7 +64,7 @@ mycode <- nimbleCode(
     for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation
     # estimated using the multivariate normal distribution
     R2[1:p2,1:p2] <- t(Ustar2[1:p2,1:p2]) %*% Ustar2[1:p2,1:p2] # calculate rhos, correlation coefficients
-    Ustar2[1:p2,1:p2] ~ dlkj_corr_cholesky(eta=1.3, p=p2) # Ustar is the Cholesky decomposition of the correlation matrix
+    Ustar2[1:p2,1:p2] ~ dlkj_corr_cholesky(eta=1.1, p=p2) # Ustar is the Cholesky decomposition of the correlation matrix
     U2[1:p2,1:p2] <- uppertri_mult_diag(Ustar2[1:p2, 1:p2], sds2[1:p2])
     # multivariate normal for temporal variance
     for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
@@ -72,7 +72,6 @@ mycode <- nimbleCode(
         eta[1:p2,s,t] ~ dmnorm(mu.zeroes2[1:p2],
                                cholesky = U2[1:p2, 1:p2], prec_param = 0)
       } } # s t 
-    
     #######################
     # Derived params
     #######################
@@ -88,57 +87,46 @@ mycode <- nimbleCode(
     # Priors for number of fledglings
     # and nest success
     for (s in 1:nsite){
-      lmu.brood[s] ~ T(dnorm(0, sd=5), 0, ) # restrict to >=1
-      lmu.nest[s] <- logit(mu.nest[s])
-      mu.nest[s] ~ dbeta(1, 1)
+      lmu.f[s] ~ dnorm(0, sd=5)
     } # s
-    delta ~ dunif(-10, 10)
-    sig.brood ~ dexp(1)
     gamma ~ dunif(-10, 10)
+    rr ~ dexp(0.05)
     
-    # Two models for fecundity, (1) brood size and (2) nest success  
-    # Brood size
-    for (k in 1:nbrood){
-      brood[k] ~ dlnorm(lam[k], sdlog=sig.brood) # truncating seems to break something
-      lam[k] <- lmu.brood[site.brood[k]] +
-        delta*treat.brood[k] +
-        eps[9, year.brood[k] ] + 
-        eta[9, site.brood[k], year.brood[k] ]
+    # Fecundity       
+    for (k in 1:nnest){
+      f[k] ~ dnegbin(ppp[k], rr)
+      ppp[k] <- rr/(rr+mu.f[k])
+      log(mu.f[k]) <- lmu.f[site.nest[k]] +  
+                      gamma*treat.nest[k] + 
+                      eps[9, year.nest[k] ] + 
+                      eta[9, site.nest[k], year.nest[k] ] 
     } # k
-    # Nest success       
-    for (n in 1:nnest){
-      nest.success[n] ~ dbern( nu[n] )
-      logit(nu[n]) <- lmu.nest[site.nest[n]] + 
-        gamma*treat.nest[n] + 
-        eps[10, year.nest[n] ] + 
-        eta[10, site.nest[n], year.nest[n] ]
-    } # n 
     # derive yearly brood size for population model
     for (t in 1:nyr){
       for (s in 1:nsite){
-        for (xx in 1:brood.end[t,s]){
-          broodmat[t,s,xx] <- lam[yrind.brood[xx,t,s]]
-        } # xx
         for (xxx in 1:nest.end[t,s]){
-          nestmat[t,s,xxx] <- nu[yrind.nest[xxx,t,s]]
+          fecmat[t,s,xxx] <- mu.f[ yrind.nest[xxx,t,s] ]
         } # xxx
-        mn.brood[t,s] <- exp( mean(broodmat[t,s,1:brood.end[t,s]]) )
-        mn.nest[t,s] <- mean( nestmat[t,s,1:nest.end[t,s]] )
-        mn.f[t,s] <- mn.brood[t,s]*mn.nest[t,s] # calc fecundity
+        mn.f[t,s] <- mean( fecmat[t,s,1:nest.end[t,s]] )
+        
+        # alternative?
+        # cant have prod on left side twice
+        # prod[t,s] <- sum( fecmat[t,s,1:nest.end[t,s]] ) 
+        # prod[t,s] ~ dpois(  mn.f[t,s]*NB[t,s] )
       }} # s t
     
     # GOF for number of fledglings
-    for (k in 1:nbrood){
-      f.obs[k] <- brood[k] # observed counts
-      f.exp[k] <- lam[k] # expected counts adult breeder
-      f.rep[k] ~ dlnorm(lam[k], sdlog=sig.brood) # expected counts
+    for (k in 1:nnest){
+      f.obs[k] <- f[k] # observed counts
+      f.exp[k] <- mu.f[k] # expected counts adult breeder
+      f.rep[k] ~ dnegbin(ppp[k], rr) # expected counts
       f.dssm.obs[k] <- abs( ( f.obs[k] - f.exp[k] ) / (f.obs[k]+0.001) )
       f.dssm.rep[k] <- abs( ( f.rep[k] - f.exp[k] ) / (f.rep[k]+0.001) )
     } # k
-    f.dmape.obs <- sum(f.dssm.obs[1:nbrood])
-    f.dmape.rep <- sum(f.dssm.rep[1:nbrood])
-    f.tvm.obs <- sd(brood[1:nbrood])^2/mean(brood[1:nbrood])
-    f.tvm.rep <- sd(f.rep[1:nbrood])^2/mean(f.rep[1:nbrood])
+    f.dmape.obs <- sum(f.dssm.obs[1:nnest])
+    f.dmape.rep <- sum(f.dssm.rep[1:nnest])
+    f.tvm.obs <- sd(brood[1:nnest])^2/mean(brood[1:nnest])
+    f.tvm.rep <- sd(f.rep[1:nnest])^2/mean(f.rep[1:nnest])
     
     ################################
     # Likelihood for counts
@@ -170,23 +158,27 @@ mycode <- nimbleCode(
         ## Adult breeders
         N[6, t+1, s] ~ dbin(mn.phiA[t, s]*mn.psiAB[t, s], NF[t, s]) # Nonbreeder to breeder
         N[7, t+1, s] ~ dbin(mn.phiB[t, s]*(1-mn.psiBA[t, s]), NB[t, s]) # Breeder to breeder
-      }} # s t
+        }} # s t
     
     # Observation process    
     for (t in 1:nyr){
       for (s in 1:nsite){
         counts[2, t, s] ~ dbin(mn.pA[t,s], NF[t, s]) # nonbreeding adult females 
         counts[3, t, s] ~ dbin(mn.pB[t,s], NB[t, s]) # breeding females 
-        NFY[t, s] <- N[1, t, s] + hacked.counts[t, s] # Includes translocated first-year females
-        NF[t, s] <- sum(N[2:4, t, s])  # number of adult nonbreeder females
+        # constrain N1+hacked.counts to be >=0
+        constraint_data[t, s] ~ dconstraint( (N[1, t, s] + hacked.counts[t, s]) >= 0) # Transfers translocated first-year females
+        NFY[t, s] <- N[1, t, s] + hacked.counts[t, s] # Transfers translocated first-year females
+        NF[t, s] <- sum(N[2:4, t, s]) # number of adult nonbreeder females
         NB[t, s] <- sum(N[5:7, t, s]) # number of adult breeder females
         Ntot[t, s] <- sum(N[1:7, t, s]) # total number of females
       }# s
-      counts[1, t, 1] ~ dpois(NFY[t, 1]) # doesn't have any zeroes so keeps a poisson
+      # First-years at different sites have different distributions
+      # for better model fit
+      counts[1, t, 1] ~ dpois(N[1, t, 1]) # doesn't have any zeroes so poisson
       counts[1, t, 2] ~ dnegbin(pp[t], r) # first year females, includes translocated/hacked
-      pp[t] <- r/(r+NFY[t, 2])
+      pp[t] <- r/(r+N[1, t, 2])
     } # t
-    r ~ dexp(0.1)
+    r ~ dexp(0.05)
     ###################
     # Assess GOF of the state-space models for counts
     # Step 1: Compute statistic for observed data
@@ -194,12 +186,12 @@ mycode <- nimbleCode(
     # Step 3: Use test statistic: number of turns
     ###################
     for (t in 1:nyr){
-      c.repFY[t, 1] ~ dpois( NFY[t, 1] )
+      c.repFY[t, 1] ~ dpois( N[1, t, 1] )
       c.repFY[t, 2] ~ dnegbin( pp[t], r )
       for (s in 1:nsite){
         c.expB[t, s] <- NB[t, s]  # expected counts adult breeder
         c.expA[t, s] <- NF[t, s] # nonbreeder
-        c.expFY[t, s] <- NFY[t, s]
+        c.expFY[t, s] <- N[1, t, s]
         c.obsB[t, s] <- counts[3, t, s]
         c.obsA[t, s] <- counts[2, t, s]
         c.obsFY[t, s] <- counts[1, t, s]  # first year
@@ -389,9 +381,7 @@ run_ipm <- function(info, datl, constl, code){
   params <- c(# pop growth 
     "lambda",
     # fecundity
-    "lmu.brood", "delta", "sig.brood", 
-    "lmu.nest", "mu.nest", "gamma", 
-    "mn.brood", "mn.nest", "mn.f", 
+    "lmu.f", "gamma", "rr", "mn.f", 
     # survival 
     "mus", "lmus", "betas",
     # abundance
@@ -416,7 +406,7 @@ run_ipm <- function(info, datl, constl, code){
   n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
   #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
   #n.chains=1; n.thin=10; n.iter=20000; n.burnin=10000
-  # n.chains=1; n.thin=1; n.iter=200; n.burnin=100
+  #n.chains=1; n.thin=1; n.iter=2000; n.burnin=0
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -425,7 +415,6 @@ run_ipm <- function(info, datl, constl, code){
                      buildDerivs = FALSE, # doesn't work when TRUE, no hope for HMC
                      calculate=T 
   ) 
-  
   
   cmod <- compileNimble(mod, showCompilerOutput = TRUE)
   confhmc <- configureMCMC(mod)
@@ -458,5 +447,5 @@ stopCluster(this_cluster)
 save(post, mycode,
      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_sites.rdata")
 
-# save(post,  
+# save(post,
 #      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-sites.Rdata")

@@ -3,16 +3,18 @@ library('nimbleHMC')
 library('MCMCvis')
 library('parallel')
 library ('coda')
-
+load("data/data.rdata")
 datl <- list( # productivity data
-              f = dfp$'# Fledged',
-              z = ifelse(dfp$'# Fledged'>0, 1, NA)
+              f = datl$f,
+              z = ifelse(datl$f>0, 1, NA)
 )
 
-constl <- list( nyr = nyr,
-                K = nrow(dfp),
-                year = as.numeric(factor(dfp$Year)), 
-                tr = dfp$tr
+constl <- list( nyr = constl$nyr,
+                K = constl$nnest,
+                year = constl$year.nest, 
+                tr = constl$treat.nest, 
+                site = constl$site.nest, 
+                nsite = constl$nsite
 )
 
 
@@ -27,18 +29,21 @@ run_p <- function(seed, datl, constl){
       ###############################
       # Likelihood for productivity
       ###############################
-      lmu.f.mean ~ dnorm(0, sd=2)
+      lmu.f.mean[1] ~ dnorm(0, sd=2)
+      lmu.f.mean[2] ~ dnorm(0, sd=2)
       sigma.f ~ dexp(1)
-      beta ~ dnorm(0, sd=2) 
+      beta ~ dnorm(0, sd=5) 
       for (k in 1:K){
-        f[k] ~ T(dpois(mu.f[k]),,3)
-        log(mu.f[k]) <- lmu.f[year[k]] + beta*tr[k] 
+        f[k] ~ dpois(mu.f[k])
+        log(mu.f[k]) <- lmu.f[year[k], site[k]] + beta*tr[k] 
       } # k
       
       for (t in 1:nyr){
-        lmu.f[t] <- lmu.f.mean + eps.f[t]
-        eps.f[t] ~ dnorm(0, sd=sigma.f)
-      } # t
+        for (s in 1:nsite){
+        lmu.f[t,s] <- lmu.f.mean[s] + eps.f[t,s]
+        eps.f[t,s] ~ dnorm(0, sd=sigma.f)
+      } 
+        }# t
       
       # GOF fecundity- Mean absolute percentage
       for (k in 1:K){
@@ -61,7 +66,7 @@ run_p <- function(seed, datl, constl){
                "tvm.obs", "tvm.rep"
   )
   
-  inits <- function(){ list(lmu.f.mean = runif(1, -2, 2),
+  inits <- function(){ list(lmu.f.mean = runif(2, -2, 2),
                             beta = runif(1, -2, 2), 
                             sigma.f = runif(1) )}
   
@@ -95,7 +100,7 @@ run_p <- function(seed, datl, constl){
   return(post)
 } # model function end
 
-run_zip_trunc <- function(seed, datl, constl){
+run_zip <- function(seed, datl, constl){
   library('nimble')
   library('coda')
   library ('nimbleHMC')
@@ -113,7 +118,7 @@ run_zip_trunc <- function(seed, datl, constl){
       sigma.nu ~ dexp(1)
       
       for (k in 1:K){
-        f[k] ~ T(dpois(z[k]*mu.f[k]),,3)
+        f[k] ~ dpois(z[k]*mu.f[k])
         log(mu.f[k]) <- lmu.f[year[k]] + beta*tr[k] 
         z[k] ~ dbern(nu[year[k]])
       }
@@ -182,6 +187,91 @@ run_zip_trunc <- function(seed, datl, constl){
   
   return(post)
 } # model function end
+
+run_nb <- function(seed, datl, constl){
+  library('nimble')
+  library('coda')
+  library ('nimbleHMC')
+  
+  code <- nimbleCode(
+    {
+      ###############################
+      # Likelihood for productivity
+      ###############################
+      lmu.f[1] ~ dnorm(0, sd=5)
+      lmu.f[2] ~ dnorm(0, sd=5)
+      sigma ~ dexp(1)
+      beta ~ dnorm(0, sd=5) 
+      r ~ dexp(0.1)
+      for (k in 1:K){
+        f[k] ~ dnegbin(ppp[k], r)
+        ppp[k] <- r/(r+mu.f[k])
+        log(mu.f[k]) <- lmu.f[site[k]] + 
+                        beta*tr[k] + 
+                        eps[year[k], site[k]]
+      } # k
+      
+      for (t in 1:nyr){
+        for (s in 1:nsite){
+          eps[t,s] ~ dnorm(0, sd=sigma)
+        } 
+      }# t
+      
+      # GOF fecundity- Mean absolute percentage
+      for (k in 1:K){
+        f.obs[k] <- f[k] # observed counts
+        f.exp[k] <- mu.f[k] # expected counts adult breeder
+        f.rep[k] ~ dnegbin(ppp[k], r) # expected counts
+        f.dssm.obs[k] <- abs( ( (f.obs[k]) - (f.exp[k]) ) / (f.obs[k]+0.001) )
+        f.dssm.rep[k] <- abs( ( (f.rep[k]) - (f.exp[k]) ) / (f.rep[k]+0.001) )
+      } # k
+      dmape.obs <- sum(f.dssm.obs[1:K])
+      dmape.rep <- sum(f.dssm.rep[1:K])
+      tvm.obs <- sd(f[1:K])^2/mean(f[1:K])
+      tvm.rep <- sd(f.rep[1:K])^2/mean(f.rep[1:K])
+    }) # model end
+  
+  params <- c( "lmu.f", "sigma", "mu.f", "beta",
+               "eps", "lmu.f", "r",
+               "dmape.obs", "dmape.rep"
+
+  )
+  
+  inits <- function(){ list(lmu.f = runif(2, -2, 2),
+                            beta = runif(1, -2, 2), 
+                            sigma = runif(1),
+                            r=rexp(1, 0.5))}
+  
+  n.chains=1; n.thin=10; n.iter=50000; n.burnin=25000
+  
+  mod <- nimbleModel(code, calculate=T, 
+                     constants = constl, 
+                     data = datl, 
+                     inits = inits(), 
+                     buildDerivs = TRUE)
+  
+  mod$calculate()
+  
+  cmod <- compileNimble(mod)
+  confhmc <- configureMCMC(mod)
+  #confhmc <- configureHMC(mod)
+  #confhmc$addSampler(target = 'mu.nu', type = 'RW')
+  #confhmc$addSampler(target = 'sigma.nu', type = 'RW')
+  
+  confhmc$setMonitors(params)
+  hmc <- buildMCMC(confhmc)
+  chmc <- compileNimble(hmc, project = mod, resetFunctions = TRUE)
+  
+  post <- runMCMC(chmc,
+                  niter = n.iter, 
+                  nburnin = n.burnin,
+                  nchains = n.chains,
+                  thin = n.thin,
+                  samplesAsCodaMCMC = T)
+  
+  return(post)
+} # model function end
+
 
 run_zip_hmc <- function(seed, datl, constl){
   library('nimble')
@@ -401,15 +491,20 @@ post[[1]] <- parLapply(cl = this_cluster,
 
 post[[2]] <- parLapply(cl = this_cluster, 
                        X = 1:4, 
-                       fun = run_zip_trunc, 
+                       fun = run_zip, 
                        dat = datl, const = constl)
 
 post[[3]] <- parLapply(cl = this_cluster, 
+                       X = 1:4, 
+                       fun = run_nb, 
+                       dat = datl, const = constl)
+
+post[[4]] <- parLapply(cl = this_cluster, 
                   X = 1:4, 
                   fun = run_zip_hmc, 
                   dat = datl, const = constl)
 
-post[[4]] <- parLapply(cl = this_cluster, 
+post[[5]] <- parLapply(cl = this_cluster, 
                        X = 1:4, 
                        fun = run_zip_hmc_marginalized, 
                        dat = datl, const = constl)
@@ -419,25 +514,39 @@ stopCluster(this_cluster)
 pars <- c( "lmu.f.mean", "sigma.f", "beta",
            "lmu.nu", "mu.nu","sigma.nu", "nu")
 
+pars.nb <- c("sigma", "beta",
+             "lmu.f", "r")
+
+pars <- c( "lmu.f.mean", "sigma.f", "beta",
+             "lmu.f"
+)
+
 MCMCsummary(post[[1]], digits=2, pars)
 MCMCsummary(post[[2]], digits=2, pars)
+MCMCsummary(post[[3]], digits=2, pars.nb)
 
 MCMCtrace(post[[1]], pars, pdf=F)
 MCMCtrace(post[[2]], pars, pdf=F)
-MCMCtrace(post[[3]], pars, pdf=F)
+MCMCtrace(post[[3]], pars.nb, pdf=F)
 
+out <- list(as.mcmc(post[[1]]), 
+            as.mcmc(post[[2]]), 
+            as.mcmc(post[[3]]),
+            as.mcmc(post[[4]]))
 
-extr_fun <- function(x) {list(as.mcmc(x[[1]]), 
-                              as.mcmc(x[[2]]), 
-                              as.mcmc(x[[3]]),
-                              as.mcmc(x[[4]]))}
+extr_fun <- function(x) {list(as.mcmc(x[[1]][[1]]), 
+                              as.mcmc(x[[1]][[2]]), 
+                              as.mcmc(x[[1]][[3]]),
+                              as.mcmc(x[[1]][[4]]))}
 out <- list()
 out[[1]] <- extr_fun(post[[1]])
 out[[2]] <- extr_fun(post[[2]])
+out[[3]] <- extr_fun(post[[3]])
 
 out[[1]] <- do.call(rbind, post[[1]])
-MCMCplot( out[[1]] , pars)
-MCMCplot( MCMCpstr(out[[2]][[1]], type = 'chains') , pars)
+MCMCplot( object=out[[1]] , pars)
+
+MCMCplot( MCMCpstr(out[[1]], type = 'chains') , pars)
 
 # ---- PPCfunction --------
 # Function for posterior predictive checks
@@ -472,6 +581,7 @@ plot.diag <- function(out, ratio=FALSE, lab=""){
 
 plot.diag(post[[1]], ratio=T, lab="Poisson")
 plot.diag(post[[2]], lab="ZIP")
+plot.diag(post[[3]], lab="NB")
 
 save(post, run_f,  
      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\fec-fit.Rdata")

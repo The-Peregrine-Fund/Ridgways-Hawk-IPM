@@ -1,38 +1,218 @@
-#### ---- catplots -------
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites_nb.rdata")
+#### ---- setup -------
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
+library ('ggplot2')
+library('reshape2')
 out <- list(as.mcmc(post[[1]]), 
              as.mcmc(post[[2]]), 
              as.mcmc(post[[3]]),
-             as.mcmc(post[[4]]))
+             as.mcmc(post[[4]]),
+             as.mcmc(post[[5]]),
+             as.mcmc(post[[6]]),
+             as.mcmc(post[[7]]),
+             as.mcmc(post[[8]]),
+             as.mcmc(post[[9]]),
+             as.mcmc(post[[10]]) )
+
+# Identify chains with NAs that 
+# failed to initialize
+NAlist <- c()
+for (i in 1:length(out)){
+  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+}
+# Subset chains to those with good initial values
+out <- out[!NAlist]
+post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
+
+#### ---- pltfunction -------
 # default settings for plots 
 plt  <- function(object, params,...) {
   MCMCplot(object=out, 
            params=params, 
            guide_axis=TRUE, 
-           HPD=TRUE, ci=c(80, 95), horiz=FALSE, ...)
+           HPD=TRUE, ci=c(80, 95), horiz=FALSE, 
+           #ylim=c(-10,10),
+           ...)
   }
 
-# I needed to abbreviate to save plot space
-# FY=first-year, NB=Nonbreeder, B=Breeder
-plt(object=out, params="sds", 
-    main="Temporal SDs", 
-    labels=c("FY survival", "NB survival", "B survival",
-             "FY to B", "NB to B", "B to NB",
-             "NB detection", "B detection",
-             "Brood size", "Nest success"))
-plt(object=out, params="sds2", 
-    main="Site-temporal SDs", 
-    labels=c("FY survival", "NB survival", "B survival",
-             "FY to B", "NB to B", "B to NB",
-             "NB detection", "B detection",
-             "Brood size", "Nest success"))
+#### ---- catplots1 -------
+# Abundance of females at Los Haitises
+par(mfrow=c(4,2))
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NFY[",1:13, ", 1]"), 
+    main="First-year (FY)\n Los Haitises", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$counts[1,,1]+constl$hacked.counts[,1], 
+     ylab="Counts", type="b")
 
 plt(object=out, 
-    params=paste0("mus[",1:13, ", 1]"), 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NF[",1:13, ", 1]"), 
+    main="Adult nonbreeder (NB)\n Los Haitises", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$counts[2,,1], 
+     ylab="Counts", type="b")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NB[",1:13, ", 1]"),
+    main="Adult breeder (B)\n Los Haitises", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$counts[3,,1], 
+     ylab="Counts", type="b")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[",1:13, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, colSums(datl$counts[,,1]), 
+     ylab="Counts", type="b")
+
+# Abundance of females at Punta Cana
+par(mfrow=c(4,2))
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NFY[",1:13, ", 2]"), 
+    main="First-year (FY)\n Punta Cana", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$counts[1,,2]+constl$hacked.counts[,2], 
+     ylab="Counts", type="b")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NF[",1:13, ", 2]"), 
+    main="Adult nonbreeder (NB)\n Punta Cana", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$counts[2,,2], 
+     ylab="Counts", type="b")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NB[",1:13, ", 2]"),
+    main="Adult breeder (B)\n Punta Cana", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$counts[3,,2], 
+     ylab="Counts", type="b")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[",1:13, ", 2]"), 
+    main="All stages\n Punta Cana", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, colSums(datl$counts[,,2]), 
+     ylab="Counts", type="b")
+
+#### ---- catplots2 -------
+# Finer population segments
+par(mfrow=c(4,2))
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 1, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nFirst-years born", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 2, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nFY to NB", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 3, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nNB to NB", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 4, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nB to NB", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 5, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nFY to B", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 6, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nNB to B",
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 7, ", ", 1:13, ", 1]"), 
+    main="Los Haitises\nB to B", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+
+
+par(mfrow=c(4,2))
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 1, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nFY born",
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 2, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nFY to NB", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 3, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nNB to NB", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 4, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nB to NB", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 5, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nFY to B", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 6, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nNB to B",
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("N[", 7, ", ", 1:13, ", 2]"), 
+    main="Punta Cana\nB to B", 
+    labels = 2011:2023, 
+    xlab = "Year", ylab= "Abundance")
+
+#### ---- catplots3 -------
+# I needed to abbreviate to save plot space
+# FY=first-year, NB=Nonbreeder, B=Breeder
+par(mfrow=c(1,2))
+plt(object=out, 
+    params=paste0("mus[",1:8, ", 1]"), 
     exact=TRUE, ISB=FALSE, 
     ylim=c(0,1),
     main="Overall means\n Los Haitises", 
@@ -42,7 +222,7 @@ plt(object=out,
     )
 
 plt(object=out, 
-    params=paste0("mus[",1:13, ", 2]"), 
+    params=paste0("mus[",1:8, ", 2]"), 
     exact=TRUE, ISB=FALSE, 
     ylim=c(0,1),
     main="Overall means\n Punta Cana", 
@@ -58,59 +238,24 @@ plt(object=out,
              "FY to B", "NB to B", "B to NB",
              "NB detection", "B detection"))
 
-# Abundance of females at Los Haitises
-par(mfrow=c(2,2))
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NFY[",1:13, ", 1]"), 
-    main="First-year (FY)\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NF[",1:13, ", 1]"), 
-    main="Adult nonbreeder (NB)\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NB[",1:13, ", 1]"),
-    main="Adult breeder (B)\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("Ntot[",1:13, ", 1]"), 
-    main="All stages\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-# Abundance of females at Punta Cana
-par(mfrow=c(2,2))
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NFY[",1:13, ", 2]"), 
-    main="First-year (FY)\n Punta Cana", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NF[",1:13, ", 2]"), 
-    main="Adult nonbreeder (NB)\n Punta Cana", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NB[",1:13, ", 2]"),
-    main="Adult breeder (B)\n Punta Cana", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("Ntot[",1:13, ", 2]"), 
-    main="All stages\n Punta Cana", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
 
+par(mfrow=c(1,1))
+sds <- paste0("sds[", 1:9, "]")
+plt(object=out, params=sds,
+    exact=TRUE, ISB=FALSE,
+    main="Temporal SDs (synchrony among sites)", 
+    labels=c("FY survival", "NB survival", "B survival",
+             "FY to B", "NB to B", "B to NB",
+             "NB detection", "B detection",
+             "Fecundity"))
+sds2 <- paste0("sds2[", 1:9, "]")
+plt(object=out, params=sds2,
+    exact=TRUE, ISB=FALSE,
+    main="Site-temporal SDs", 
+    labels=c("FY survival", "NB survival", "B survival",
+             "FY to B", "NB to B", "B to NB",
+             "NB detection", "B detection",
+             "Fecundity"))
 # Correlations among vital rates
 # Plot is messy with only a few strong correlations
 ind <- 1
@@ -121,9 +266,9 @@ for (i in 1:(nrow(outp$R)-1)){
   R2s[ind] <- paste0("R2[",i,", ", j, "]")
   ind <- ind+1
   }}
-par(mfrow=c(2,1))
+par(mfrow=c(1,1))
 plt(object=out, params=Rs, exact=TRUE, ISB=FALSE, 
-    main="Correlations btw demographic rates\n over time\n also called synchrony",
+    main="Correlations btw demographic rates\n over time (synchrony)",
     xlab = "Rhos", guide_lines=TRUE)
 plt(object=out, params=R2s, exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites",
@@ -133,54 +278,80 @@ plt(object=out, params=R2s, exact=TRUE, ISB=FALSE,
 # mu.nest = mean nest success
 par(mfrow=c(1,1))
 plt(object=out, 
-    params=c("lmu.brood", "sig.brood", "mu.nest"), 
-    labels= c("Brood size\n(log scale)\nLos Haitises",
-              "Brood size\n(log scale)\nPunta Cana",
-              "SD among females", 
-              "Prob. of\nnest success\n Los Haitises", 
-              "Prob. of\nnest success\n Punta Cana"))
-# delta = nest treatment effect on brood size
-# gamma = nest treatment effect on nest success
+    params=c("lmu.f"), 
+    labels= c("Fecundity\n(log scale)\nLos Haitises",
+              "Fecundity\n(log scale)\nPunta Cana"))
+
+# gamma = nest treatment effect on fecundity
 plt(object=out, 
-    params=c("delta", "gamma"), 
-    main="Treatment effects", 
-    labels= c("Brood size", "Nest success"))
+    params=c("gamma"), 
+    main="Anti-Parasitic Fly\nTreatment Effects", ylim=c(0,3))
 
 # Annual averages for integration into the population model
 labs <- c(paste0("LH ",2011:2023), paste0("PC ",2011:2023))
 plt(object=out, params="mn.phiFY", ylim=c(0,1),
     main="First-year survival", labels = labs,
     xlab = "Year", ylab= "Survival")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.phiA", ylim=c(0,1),
     main="Adult nonbreeder", labels = labs,
     xlab = "Year", ylab= "Survival")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.phiB", ylim=c(0,1),
     main="Breeder", labels = labs,
     xlab = "Year", ylab= "Survival")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.psiFYB", ylim=c(0,1),
     main="First-year to breeder", labels = labs,
     xlab = "Year", ylab= "Recruitment")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.psiAB", ylim=c(0,1),
     main="Adult nonbreeder to breeder", labels = labs,
     xlab = "Year", ylab= "Recruitment")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.psiBA", ylim=c(0,1),
     main="Adult breeder to nonbreeder", labels = labs,
     xlab = "Year", ylab= "Recruitment")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.pA", ylim=c(0,1),
     main="Nonbreeder", labels = labs,
     xlab = "Year", ylab= "Detection")
+abline(v=13.5, lwd=2)
 plt(object=out, params="mn.pB", ylim=c(0,1),
     main="Breeder", labels = labs,
     xlab = "Year", ylab= "Detection")
-# plt(object=out, params="mn.f",
-#     main="", labels = labs,
-#     xlab = "Year", ylab= "Fecundity")
-plt(object=out, params="mn.nest", ylim=c(0,1),
-    main="", labels = labs,
-    xlab = "Year", ylab= "Nest success")
-# plt(object=out, params="mn.brood",
-#     main="", labels = labs,
-#     xlab = "Year", ylab= "Brood size")
+abline(v=13.5, lwd=2)
+plt(object=out, params="mn.f",
+    main="", labels=labs,
+    xlab = "Year", ylab= "Fecundity")
+abline(v=13.5, lwd=2)
+
+#### ----popstructure -----
+
+mdFY <-  apply(outp$NFY, c(1,2), median) 
+mdB <-  apply(outp$NB, c(1,2), median) 
+mdF <-  apply(outp$NF, c(1,2), median) 
+lFY <- melt(mdFY)
+lB <- melt(mdB)
+lF <- melt(mdF)
+lFY$Stage <- "First-year"
+lB$Stage <- "Breeder"
+lF$Stage <- "Nonbreeder"
+ldat <- rbind(lFY, lB, lF)
+colnames(ldat)[1:3] <- c("Year", "Sitenum", "Number") 
+ldat$Site <- ifelse(ldat$Sitenum==1, "Los Haitises", "Punta Cana")
+
+# Use median number of females in each stage
+# to plot an approximate population structure
+ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=Year)) + 
+  geom_bar(position="fill", stat="identity") +
+  ylab("Proportion of population") + 
+  facet_wrap("Site")
+
+ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=Year)) + 
+  geom_bar(position="stack", stat="identity") +
+  ylab("Numer of females") + 
+  facet_wrap("Site", scales = "free_y")
 
 #### ---- paramests -------
 pars1 <- c("sds", "sds2","mus", "betas",
@@ -192,9 +363,12 @@ pars1 <- c("sds", "sds2","mus", "betas",
 # In this order: FY survival, NB survival, B survival, 
 # FY to B recruitment, NB to B recruitent, B to NB recruitment,
 # Detection NB, Detection B
-MCMCsummary(post, params = pars1[1:2], 
-            digits=2, HPD = T, 
+
+MCMCsummary(post2, params = c(sds, sds2), 
+            exact=TRUE, ISB=FALSE,
+            digits=2, HPD = T,
             hpd_prob = 0.80, pg0= TRUE)
+
 # Mus are means for 
 # mus[1, site] , where site=1 is LH and site=2 is PC
 # Survival of first years = mus[1,]
@@ -205,7 +379,7 @@ MCMCsummary(post, params = pars1[1:2],
 # Transition from breeder to nonbreeder = mus[6,]
 # Detection probability of nonbreeders = mus[7,]
 # Detection probability of breeders
-MCMCsummary(post, params = pars1[3:4], 
+MCMCsummary(post2, params = pars1[3:4], 
             digits=3, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
 
@@ -217,45 +391,30 @@ MCMCsummary(post, params = pars1[3:4],
 # All are presented as N[time, site], 
 # where time 1=2011 ... 13=2023, 
 # site 1 = LH and site 2=PC
-MCMCsummary(post, params = pars1[5:8], 
+MCMCsummary(post2, params = pars1[5:8], 
             digits=2, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
-MCMCsummary(post, params = pars1[9:16], 
+MCMCsummary(post2, params = pars1[9:16], 
             digits=2, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
-MCMCsummary(post, params = "R", 
+# Correlations among demographic rates time (synchrony)
+MCMCsummary(post2, params = "R", 
             digits=2, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
-# Estimates of brood size, nest success, and fecundity
-# indices are for sites, 1=LH and 2=PC
-pars2 <- c("lmu.brood", "delta", "sig.brood",
-           "mu.nest", "gamma") 
-           #"mn.f", "mn.nest", "mn.brood" )
-MCMCsummary(post, params = pars2, 
+# Correlations among demographic rates site x time
+MCMCsummary(post2, params = "R2", 
             digits=2, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE )
+            hpd_prob = 0.80, pg0= TRUE)
 
 #### ---- traceplots ------
-MCMCtrace(post, pdf=FALSE, params= "sds")
-MCMCtrace(post, pdf=FALSE, params= "sds2")
-MCMCtrace(post, pdf=FALSE, params= "mus")
-MCMCtrace(post, pdf=FALSE, params= "betas")
-MCMCtrace(post, pdf=FALSE, params= "NF")
-MCMCtrace(post, pdf=FALSE, params= "NFY")
-MCMCtrace(post, pdf=FALSE, params= "NB")
-MCMCtrace(post, pdf=FALSE, params= "R")
-# Brood size
-## Mean brood size
-MCMCtrace(post, pdf=FALSE, params= "lmu.brood")
-## Effect from nest treatment on brood size
-MCMCtrace(post, pdf=FALSE, params= "delta")
-## SD among nests
-MCMCtrace(post, pdf=FALSE, params= "sig.brood")
-# Nest success
-## Mean nest success
-MCMCtrace(post, pdf=FALSE, params= "mu.nest")
-## Effect from nest treatment on nest success
-MCMCtrace(post, pdf=FALSE, params= "gamma")
+MCMCtrace(post2, pdf=FALSE, params= sds, exact=TRUE, ISB=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= sds2, exact=TRUE, ISB=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "mus")
+MCMCtrace(post2, pdf=FALSE, params= "betas")
+MCMCtrace(post2, pdf=FALSE, params= "NF")
+MCMCtrace(post2, pdf=FALSE, params= "NFY")
+MCMCtrace(post2, pdf=FALSE, params= "NB")
+MCMCtrace(post2, pdf=FALSE, params= "R")
 
 #### ---- fit ------
 # Goodness of fit check
@@ -302,13 +461,13 @@ fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=1,
-          lab="binomial", jit=300)
+          lab="Breeder counts- Poisson", jit=300)
 # nonbreeder, ind=2
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=2,
-          lab="binomial", jit=300)
+          lab="Breeder counts- Poisson", jit=300)
 # first-year, ind=3
 # poisson failed fit test bp=0
 # Currently running models to try and fix
@@ -316,5 +475,10 @@ fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=3,
-          lab="Neg binomial", jit=300)
-
+          lab="First-year counts\nNeg binomial-Poisson", jit=300)
+# fecundity
+fit.check(out, ratio=F,
+          name.rep="f.dmape.rep", 
+          name.obs="f.dmape.obs",
+          ind=1,
+          lab="Fecundity-Neg binomial", jit=300)

@@ -41,8 +41,10 @@ df$ID <- paste(df$l.code, df$r.code,
                df$`left.color`, df$`right.color`, sep="-")
 # subset
 df <- df[df$sex=="Female",]
-df <- df[df$current.population!="AV",] # remove because small sample size
-
+# remove two fostered birds
+df <- df[df$history !="Foster",]
+#df <- df[df$current.population!="AV",] # remove because small sample size
+df$current.population <- factor(df$current.population, levels= c("LHNP","PC","AV") )
 # separate marked and unmarked birds
 not.banded <- c("NB-NB-NB-NB", "NB-NR-NB-NR", "NR-NR-NR-NR")
 df.unmarked <- df[df$ID %in% not.banded,] # unmarked df
@@ -119,6 +121,9 @@ nsite <- length(unique(df$current.population))
 min.yr.ind <- tapply(df.marked.max$year.resighted, df.marked.max$ID, min, na.rm=T)
 last.year.inds <- rownames(min.yr.ind)[min.yr.ind==lyr]
 dfm <- df.marked.max[!df.marked.max$ID %in% last.year.inds, ]
+# Remove AV birds
+dfm <- dfm[dfm$current.population!="AV", ]
+
 
 nind <- length(unique(dfm$ID))
 ind.nu <- sort(unique(dfm$ID))
@@ -158,7 +163,7 @@ for (i in 1:nind){
   } # else
 } # i
 
-# did any birds switch sites?
+# did any adult birds switch sites?
 pop[apply(pop, 1, function(x){ y <- min(x); any(x!=y) } ),]
 # none switched
 
@@ -168,9 +173,9 @@ lpop <- melt(pop)
 colnames(lpop) <- c("ID", "year", "site")
 lpop$year2 <- lpop$year-2010
 surv.end <- table(lpop$year2, lpop$site)
-yrind.surv <- array(NA, dim = c(max(surv.end), nyr, nsite) )
+yrind.surv <- array(NA, dim = c(max(surv.end), nyr, nsite-1) )
 for (t in 1:nyr){
-  for (s in 1:nsite){
+  for (s in 1:(nsite-1)){
     spop <- pop[,t]
     if(surv.end[t, s]==0){next} else{
       yrind.surv[1:surv.end[t, s],t,s] <- which(spop==s)
@@ -260,22 +265,7 @@ df$group <- ifelse(df$group=="NR", NA, as.numeric(df$group) )
 levels(factor(df$group))
 treat <- tapply(df$group, list(df$territory.name, df$year.resighted), max, na.rm=TRUE)
 treat <- ifelse(treat==3, 1, ifelse(treat==1,0,NA))
-# plot treatments over time
-plot(2011:2023, colSums(treat, na.rm=T), 
-     type="b", xlab="Year", ylab="Number treated",
-     main="All Sites")
-# plot just Los Haitises
-keepersLH <- df$territory.name[df$current.population=="LHNP"]
-treatLH <- treat[rownames(treat) %in% keepersLH,]
-plot(2011:2023, colSums(treatLH, na.rm=T), 
-     type="b", xlab="Year", ylab="Number treated",
-     main="Los Haitises")
-# plot punta cana
-keepersPC <- df$territory.name[df$current.population=="PC"]
-treatPC <- treat[rownames(treat) %in% keepersPC,]
-plot(2011:2023, colSums(treatPC, na.rm=T), 
-     type="b", xlab="Year", ylab="Number treated",
-     main="Punta Cana")
+
 # make long form to speed up bc many NAs
 lprod <- melt(prod)
 ltreat <- melt(treat)
@@ -286,35 +276,57 @@ lp <- lp[!is.na(lp$fledged) & !is.na(lp$treat),]
 lp$nestsuccess <- ifelse(lp$fledged>0, 1, 0) 
 lp$brood <- ifelse(lp$fledged>0, lp$fledged, NA)
 lp$year2 <- lp$year-(min(lp$year)-1)
+# add sites
+sites <- df[!duplicated(df$territory.name), c("current.population", "origin", "territory.name")]
+lp <- merge(lp, sites, by.x="ter", by.y="territory.name")
+# fledged ==0 come from stage==3 birds where current.population 
+# best represents their site, but fledged>0 come from birds with stage==1
+# where origin best represents their site. Hence the next line
+lp$site <- ifelse(lp$fledged==0, as.character(lp$current.population), as.character(lp$origin) )
+lp$site2 <- as.numeric(factor(lp$site, levels=c("LHNP","PC","AV")))
+# Remove adults attempting to breed in AV
+lp <- lp[lp$site!="AV", ]
+
+nest.end <- table(lp$year2, lp$site2)
+yrind.nest <- array(NA, dim = c(max(nest.end), nyr, nsite-1) )
+for (t in 1:nyr){
+  for (s in 1:(nsite-1)){
+    if(nest.end[t, s]==0){next} else{
+      yrind.nest[1:nest.end[t, s],t,s] <- which(lp$year2==t & lp$site2==s)
+    } # else
+  }} # s t
 
 lb <- lp[!is.na(lp$brood),]
+# fill years without observations
+#lb[nrow(lb)+1, ] <- c("Cacatica 1 Pedro", 2011, NA, 0, 1, NA, 1)
 
-# add sites
-sites <- df[!duplicated(df$territory.name), c("current.population", "territory.name")]
-lp <- merge(lp, sites, by.x="ter", by.y="territory.name")
-lp$site2 <- as.numeric(factor(lp$current.population))
-
-lb <- merge(lb, sites, by.x="ter", by.y="territory.name")
-lb$site2 <- as.numeric(factor(lb$current.population))
-# create matrixes to summarize by year and site
+# create matrices to summarize by year and site
 brood.end <- table(lb$year2, lb$site2)
-yrind.brood <- array(NA, dim = c(max(brood.end), nyr, nsite) )
+brood.end <- brood.end[order(as.numeric(rownames(brood.end))),]
+yrind.brood <- array(NA, dim = c(max(brood.end), nyr, nsite-1) )
 for (t in 1:nyr){
-  for (s in 1:nsite){
+  for (s in 1:(nsite-1)){
     if(brood.end[t, s]==0){next} else{
   yrind.brood[1:brood.end[t, s],t,s] <- which(lb$year2==t & lb$site2==s)
 } # else
   }} # s t
 
-nest.end <- table(lp$year2, lp$site2)
-yrind.nest <- array(NA, dim = c(max(nest.end), nyr, nsite) )
-for (t in 1:nyr){
-  for (s in 1:nsite){
-    if(nest.end[t, s]==0){next} else{
-  yrind.nest[1:nest.end[t, s],t,s] <- which(lp$year2==t & lp$site2==s)
-} # else
-  }} # s t
-
+# plot nest treatments over time
+plot(2011:2023, colSums(treat, na.rm=T), 
+     type="b", xlab="Year", ylab="Number treated",
+     main="All Sites")
+# plot just Los Haitises
+keepersLH <- df$territory.name[df$origin=="LHNP"]
+treatLH <- treat[rownames(treat) %in% keepersLH,]
+plot(2011:2023, colSums(treatLH, na.rm=T), 
+     type="b", xlab="Year", ylab="Number treated",
+     main="Los Haitises")
+# plot punta cana
+keepersPC <- df$territory.name[df$origin=="PC"]
+treatPC <- treat[rownames(treat) %in% keepersPC,]
+plot(2011:2023, colSums(treatPC, na.rm=T), 
+     type="b", xlab="Year", ylab="Number treated",
+     main="Punta Cana")
 #**********************
 #* 8. Hacked birds ----
 #**********************
@@ -336,11 +348,28 @@ hacked.to <- tapply(df.hacked$ID, list(df.hacked$year.resighted, df.hacked$curre
 hacked.from <- tapply(df.hacked$ID, list(df.hacked$year.resighted, df.hacked$origin), length, default=0)
 hacked <- data.frame(yr=2011:2023)
 hacked <- merge(hacked, hacked.from, by.x="yr", by.y=0, all.x=T)
-hacked <- merge(hacked, hacked.to, by.x="yr", by.y=0, all.x=T)
+hacked <- merge(hacked, hacked.to[, c(2,3)], by.x="yr", by.y=0, all.x=T)
 hacked[is.na(hacked$LHNP),"LHNP"] <- 0
 hacked[is.na(hacked$PC),"PC"] <- 0
+hacked[is.na(hacked$AV),"AV"] <- 0
 hacked$LHNP <- hacked$LHNP*-1
+ha <- as.matrix(cbind(0,hacked$PC, hacked$AV))
+hr <- as.matrix(cbind(hacked$LHNP*-1, 0, 0))
 
+ha.ind <- which(ha!=0, arr.ind=T)
+ha.end <- table(ha.ind[,2])
+
+ha.mat <- array(NA, dim = c(max(ha.end), 3) )
+ha.mat2 <- array(NA, dim = c(nyr, 3) )
+  for (s in 2:3) { # no translocations to LHNP site=1
+  ha.temp <- ha.ind[ha.ind[,2]==s,]
+  ha.temp <- ha.temp[order(ha.temp[,1]), ]
+  ha.mat[1:ha.end[[s-1]], s] <- ha.temp[,1] 
+  
+  h2 <- c(1:nyr)[!c(1:nyr) %in% ha.temp[,1]]
+  ha.mat2[1:length(h2), s] <- h2
+  }
+ha.mat2[1:nyr, 1] <- 1:nyr
 #create a hacked or not hacked covariate for each individual
 # this places fostered eggs into wild birds
 hacked.cov.survival <- ifelse(rownames(y) %in% df.hacked$ID, "hacked", "wild") |>
@@ -350,17 +379,18 @@ names(hacked.cov.survival) <-  rownames(y)
 # check for changes in hacked status over time to
 # check data
 tapply(dfm$history, list(dfm$ID, dfm$year.resighted), min)
+
 #**********************
 #* 9. Fostered ----
 #**********************
-#* Brought from los haistes to puntacana
+#* Brought from los haitises to puntacana
 #* only one bird for now
-df.foster <- df[df$history =="Foster",]
+# df.foster <- df[df$history =="Foster",]
 
 #**********************
 #* 10. Covariates ----
 #**********************
-p <- p2 <- 10
+p <- p2 <- 9
 counts <- array(NA, dim=dim(counts.marked), dimnames=dimnames(counts.marked))
 counts[1,,] <- counts.marked[1, , ]
 counts[c(2,3),,] <- counts.marked[c(2,3), ,] + counts.unmarked[c(1,2), ,]
@@ -373,6 +403,8 @@ counts[c(2,3),,] <- counts.marked[c(2,3), ,] + counts.unmarked[c(1,2), ,]
 counts[1,,1] <- counts[1,,1] + hacked$LHNP*-1
 # subtract from PC
 counts[1,,2] <- counts[1,,2] - hacked$PC
+# subtract from AV
+counts[1,,3] <- counts[1,,3] - hacked$AV
 #####################################
 # from IPMbook package
 dUnif <- function (lower, upper) 
@@ -385,18 +417,34 @@ dUnif <- function (lower, upper)
   for (i in 1:nrow) out[i, A[i]:B[i]] <- rep(1/n[i], n[i])
   return(drop(out))
 }
-pPrior <- array(NA, dim=c(max(counts)*2,2))
-s.end <- c(max(counts[,,1])*2, max(counts[,,2])*2)
+
+mxall <- max(counts)*5
+pPrior <- array(NA, dim=c(mxall,2))
+s.end <- c(max(counts[,,1])*5, max(counts[,,2])*5 )
 pp1 <- dUnif(1, s.end[1])
 pp2 <- dUnif(1, s.end[2])
 pPrior[1:s.end[1],1] <- pp1
 pPrior[1:s.end[2],2] <- pp2
 
+# get mean abundance from preliminary run to 
+# include density dependence
+# load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
+# library ('MCMCvis')
+# library ('coda')
+# out <- list(as.mcmc(post[[1]]), 
+#             as.mcmc(post[[2]]), 
+#             as.mcmc(post[[3]]),
+#             as.mcmc(post[[4]]))
+# outp <- MCMCpstr(out, type="chains")
+# ntot.post <- apply(outp$Ntot, c(2,3), mean)
+# ntot <- apply(ntot.post, 1, mean)
+
 #**********************
-#* 11. Data list for analysis ----
+#* 11. Data for analysis in NIMBLE----
 #**********************
 datl <- list( # productivity data
-              brood = lb$brood,
+              f = lp$fledged,
+              brood = as.numeric(lb$brood),
               nest.success = lp$nestsuccess,
               # survival data
               y = y,
@@ -404,41 +452,48 @@ datl <- list( # productivity data
               mu.zeroes = rep(0,p),
               mu.zeroes2 = rep(0,p2),
               # count data
-              counts = counts
+              counts = counts[,,1:2],
+              constraint_data = array(1, dim=c(nyr, nsite-1))
               )
 
 constl <- list( # survival 
-                first = frst, 
                 nind = nind,
                 nyr = nyr,
+                nsite = nsite-1,
+                first = frst, 
                 site = pop, 
-                nsite = nsite,
                 yrind.surv = yrind.surv,
                 surv.end = surv.end,
                 # productivity 
-                treat.brood = lb$treat,
-                nbrood = nrow(lb),
-                year.brood = lb$year2, 
-                yrind.brood = yrind.brood,
-                brood.end = brood.end,
-                site.brood = as.numeric(factor(lb$current.population)), 
-                mintrunc = min(lb$brood),
-                maxtrunc = max(lb$brood),
-                
                 treat.nest = lp$treat,
                 nnest = nrow(lp),
                 year.nest = lp$year2,
                 yrind.nest = yrind.nest,
                 nest.end = nest.end,
-                site.nest = as.numeric(factor(lp$current.population)),
+                site.nest = lp$site2,
+                
+                treat.brood = lb$treat,
+                nbrood = nrow(lb),
+                year.brood = lb$year2, 
+                yrind.brood = yrind.brood,
+                brood.end = brood.end,
+                mintrunc = min(lb$brood),
+                maxtrunc = max(lb$brood),
+                site.brood = ,
+                
                 pPrior = pPrior,
                 p = p, # number of random yr effects
                 p2 = p2, # number of random yr effects
                 
                 s.end=s.end,
                 hacked = as.numeric(hacked.cov.survival)-1,
-                hacked.counts = hacked[, -1]
-                # #pop_f = as.numeric(factor(dfp$site)),
+                hacked.added = ha,
+                ha.ind = ha.mat,
+                ha.end = c(0, ha.end),
+                ha.ind2 = ha.mat2,
+                ha.end2 = c(13,7,9),
+                hacked.removed = hr, 
+                hacked.counts = as.matrix( hacked[,-1] )
 )
 
 #*******************
@@ -475,179 +530,137 @@ z.inits[datl$y %in% c(1:3)] <- datl$y[datl$y %in% c(1:3)]
 z.inits <- ifelse(is.na(z.inits), z, z.inits)
 
 # # create inits for rhos
-Ustar <- array( runif(p*p, 0.01, 0.1), dim=c(p,p))
-diag(Ustar) <- 1 # set diagonal to 1
-Ustar[lower.tri(Ustar)] <- 0 # set lower diag to zero
-t(Ustar)%*%Ustar
+rUstar <- array( runif(p*p, 0.01, 0.1), dim=c(p,p))
+diag(rUstar) <- 1 # set diagonal to 1
+rUstar[lower.tri(rUstar)] <- 0 # set lower diag to zero
+t(rUstar)%*%rUstar
 
 # Abundance
-NFYi <- datl$counts[1,,]
-NFi <- datl$counts[2,,] + 10
-NBi <- datl$counts[3,,] + 16
+# account for hacked first years
+# c1 <- data.frame(LHNP=counts[1,,1] ,
+#             PC=counts[1,,2] ,
+#             AV=counts[1,,3] )
+# 
+# N1i <- c1
+# NFi <- counts[2,,] 
+# NBi <- counts[3,,]
 
 # In n~binom(p,N) ensure that is always n<N
 # tedious but necessary
 # FYs
-N22 <-  rbind( c(0, 2), round(NFYi[1:(nyr-1),]/2) )
-N55 <- rbind( c(0, 2), NFYi[1:(nyr-1),]  )-N22
-# Nonbreeders
-N33 <- rbind( c(4, 4), round(NFi[1:(nyr-1),]/2) )
-N66 <- rbind( c(10, 10), NFi[1:(nyr-1),])-N33
-# breeders
-N77 <- rbind( c(36, 12) , NBi[1:(nyr-1),] )
+# hs <- rbind(c(0,0,0), constl$hacked.counts[(1:nyr-1),] ) 
+# 
+# N22 <-  floor( (rbind( c(2, 2, 0), round(N1i[1:(nyr-1),]) ) +
+#   hs) /2 )
+# N55 <- N22
+# # Nonbreeders
+# N33 <- floor( rbind( c(4, 4, 0), NFi[1:(nyr-1),]/2 ) )
+# N66 <- rbind( c(10, 10, 0), NFi[1:(nyr-1),])-N33
+# # breeders
+# N77 <- rbind( c(36, 12, 0) , NBi[1:(nyr-1),] )
+#                                 
+# N <- array(NA, dim=c(7, nyr, nsite) )
+# N[1,,] <- as.matrix(c1)
+# N[2,,] <- as.matrix(N22)
+# N[3,,] <- as.matrix(N33)
+# N[4,,] <- 0
+# N[5,,] <- as.matrix(N55)
+# N[6,,] <- as.matrix(N66)
+# N[7,,] <- as.matrix(N77)
 
-#N11_1 <- ifelse(datl$counts[1,,1]<hacked.from, hacked.from, datl$counts[1,,1])
-#N11_2 <- cbind(N11_1, datl$counts[1,,2])
-                                
-N <- array(NA, dim=c(7, constl$nyr, constl$nsite) )
-N[1,,] <- datl$counts[1,,1]
-N[2,,] <- N22
-N[3,,] <- N33
-N[4,,] <- 0
-N[5,,] <- N55
-N[6,,] <- N66
-N[7,,] <- N77
-
-N[3,2:4,1] <- 3
-N[6,2:4,1] <- 3
-
-NFYi2 <-  N[1,,]
-NFi2 <-  apply(N[2:4,,], c(2,3), sum)
-NBi2 <-  apply(N[5:7,,], c(2,3), sum)
-
-# Lots of trial and error because of cascading numbers
-# Make a function to check for valid inits
-Ncheck <- function(x, NFYi2, NFi2, NBi2){
-Nc <- array(NA, dim=dim(x))
-for (s in 1:constl$nsite){
-  for(t in 1: (nyr-1) ){
-    Nc[2,t,s] <-  N[2,t+1,s] <= NFYi2[t,s]
-    Nc[3,t,s] <-  N[3,t+1,s] <= NFi2[t,s]
-    Nc[4,t,s] <-  N[4,t+1,s] <= NBi2[t,s]
-    
-    Nc[5,t,s] <-  N[5,t+1,s] <= NFYi2[t,s]
-    Nc[6,t,s] <-  N[6,t+1,s] <= NFi2[t,s]
-    Nc[7,t,s] <-  N[7,t+1,s] <= NBi2[t,s]
-  } }
-return (Nc)
-}
-
-Ncheck(N, NFYi2=NFYi2, NFi2=NFi2, NBi2=NBi2)
-
-N[7,2,1] <- 40
-N[7,6,1] <- 70
-
-N[3,6,2] <- 5
-N[6,6,2] <- 5
-N[7,2,2] <- 16
-N[7,9,2] <- 32
-
-NFYi2 <-  N[1,,]
-NFi2 <-  apply(N[2:4,,], c(2,3), sum)
-NBi2 <-  apply(N[5:7,,], c(2,3), sum)
-Ncheck(N, NFYi2=NFYi2, NFi2=NFi2, NBi2=NBi2)
-
-N[3,7,2] <- 4
-
-NFYi2 <-  N[1,,]
-NFi2 <-  apply(N[2:4,,], c(2,3), sum)
-NBi2 <-  apply(N[5:7,,], c(2,3), sum)
-Ncheck(N, NFYi2=NFYi2, NFi2=NFi2, NBi2=NBi2)
-
-N[3,8,2] <- 4
-N[6,8,2] <- 4
-NFYi2 <-  N[1,,]
-NFi2 <-  apply(N[2:4,,], c(2,3), sum)
-NBi2 <-  apply(N[5:7,,], c(2,3), sum)
-Ncheck(N, NFYi2=NFYi2, NFi2=NFi2, NBi2=NBi2)
-
-N[7,9,2] <- 29
-NFYi2 <-  N[1,,]
-NFi2 <-  apply(N[2:4,,], c(2,3), sum)
-NBi2 <-  apply(N[5:7,,], c(2,3), sum)
-Ncheck(N, NFYi2=NFYi2, NFi2=NFi2, NBi2=NBi2)  
-  
-# check that counts are < totals
-counts[2,,1] < NFi2[,1]
-counts[2,,2] < NFi2[,2]
-counts[3,,1] < NBi2[,1]
-counts[3,,2] < NBi2[,2]
+# # automate fixing initial values
+# Nfix <- function(N, N1, NF, NB, hack){
+#   Nc <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$Nc
+#   N2 <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$N2
+#   j <- 1
+#   while(any(Nc[2:7, 1:12, 1:3]==FALSE) ) {
+#     Fs <- which(Nc==FALSE, arr.ind=T)
+#     for (i in 1:nrow(Fs)){
+#       j1 <- Fs[i,1]; j2 <- Fs[i,2]; j3 <- Fs[i,3]
+#       if (N[j1, j2+1, j3]>0) {
+#           N[j1, j2+1, j3] <- N2[j1, j2, j3] -1
+#       } else{ N[j1, j2+1, j3] <- 0; next }
+#   } # i
+#     N1 <- N[1,,]
+#     NF <- apply(N[c(2:4),,], c(2,3), sum) + 20
+#     NB <- apply(N[c(5:7),,], c(2,3), sum) + 20
+#     Nc <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$Nc
+#     N2 <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$N2
+#     j <- j+1
+# } # while
+#   print(paste0(j, " iterations"))
+#   return(list(Nfixed=N, Ncheck=Nc, N1=N1, NF=NF, NB=NB))
+#   }# Nfix
+# 
+#Nf <- Nfix(N=N, N1=N1i, NF=NFi, NB=NBi, hack=hs)
 
 # We need good initial values to prevent chains from getting stuck. 
 # Use results from a non-integrated analysis get better starting values 
 library ('MCMCvis')
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-simp.rdata")
-mus <- MCMCsummary(post, params = "mus", 
-            digits=2, HPD = T, 
-            hpd_prob = 0.85, pg0= TRUE)
-sds <- MCMCsummary(post, params = "sds", 
-            digits=2, HPD = T, 
-            hpd_prob = 0.85, pg0= TRUE)
-betas <- MCMCsummary(post, params = "betas", 
-                   digits=2, HPD = T, 
-                   hpd_prob = 0.85, pg0= TRUE)
-
-repro <- MCMCsummary(post, 
-                          params = c("lmu.brood", "delta",
+repro <- MCMCsummary(post, params = c("lmu.brood", "delta",
                           "sig.brood",
-                          "mu.nest", "gamma"), 
-                          digits=2, HPD = T, 
-                          hpd_prob = 0.85, pg0= TRUE)
+                          "mu.nest", "gamma"))
+
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\surv_nimble.Rdata")
+mus <- MCMCsummary(post, params = "mus")
+sds <- MCMCsummary(post, params = "sds")
+sds2 <- MCMCsummary(post, params = "sds2")
+betas <- MCMCsummary(post, params = "betas")
+u <- MCMCpstr(post, "Ustar", type="chains")
+Ustar <- apply(u$Ustar, c(1,2), mean)
+Ustar <- rbind(Ustar, rUstar[9,1:8]) # tack on one row
+Ustar <- cbind(Ustar, rUstar[1:9,9]) # tack on column including random values
+Ustar <- abs(Ustar)
+diag(Ustar) <- 1
+u2 <- MCMCpstr(post, "Ustar2", type="chains")
+Ustar2 <- apply(u2$Ustar2, c(1,2), mean)
+Ustar2 <- rbind(Ustar2, rUstar[9,1:8]) # tack on one row
+Ustar2 <- cbind(Ustar2, rUstar[1:9,9]) # tack on column including random values
+Ustar2 <- abs(Ustar2)
+diag(Ustar2) <- 1
+
+Ni <- array(0, dim=dim(N))
+Ni[1,,1] <- abs(constl$hacked.counts[,1]+3)
 
 inits.func1 <- function (){
   list(  
-  # fecundity inits
-  lmu.brood = c(repro$mean[1], repro$mean[1]),
-  delta = repro$mean[2], 
-  sig.brood = repro$mean[3],
-  mu.nest = c(repro$mean[4], repro$mean[4]),
-  gamma = repro$mean[5], 
+  # fecundity inits from submodel run
+  lmu.f = c(-2.7, -3.2),
+  gamma = 1.8, 
+  rr = 27,
   # survival
   z = z.inits, 
-  mus = cbind(mus$mean, mus$mean), # values from non-integrated run
+  mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
-  sds = sds$mean,
+  sds = c(sds$mean, runif(1)),
   Ustar = Ustar,
-  sds2 = rexp(p2, 3),
-  Ustar2 = Ustar,
+  sds2 = c(sds2$mean, runif(1)),
+  Ustar2 = Ustar2,
   # counts
-  N = N,
-  NFY = NFYi2,
-  NF = NFi2,
-  NB = NBi2, 
-  Ntot = NFYi2+NFi2+NBi2, 
   r = rexp(1)
   )}
 
+
+# set seed for reproducibility
+# then draw random seeds (but reproducible) for each chain
+set.seed(1)
+seeds <- sample(1:1000000, size=10, replace=FALSE)
 par_info <- # allows for different seed for each chain
   list(
-    list(seed=1, inits = inits.func1()),
-    list(seed=2, inits = inits.func1()),
-    list(seed=3, inits = inits.func1()),
-    list(seed=4, inits = inits.func1())
+    list(seed=seeds[1], inits = inits.func1()),
+    list(seed=seeds[2], inits = inits.func1()),
+    list(seed=seeds[3], inits = inits.func1()),
+    list(seed=seeds[4], inits = inits.func1()),
+    list(seed=seeds[5], inits = inits.func1()),
+    list(seed=seeds[6], inits = inits.func1()),
+    list(seed=seeds[7], inits = inits.func1()),
+    list(seed=seeds[8], inits = inits.func1()),
+    list(seed=seeds[9], inits = inits.func1()),
+    list(seed=seeds[10], inits = inits.func1())
   )
 
-inits.func <- function() {
-  list(  
-  # fecundity inits
-  # lmu.brood = runif(1, 0, 0.5),
-  # delta = runif(1, -0.5, 0.5), 
-  # sig.brood = rexp(1),
-  # sig.brood.t = rexp(1),
-  # sig.nest = rexp(1),
-  # mu.nest = runif(1),
-  # gamma = runif(1, -0.5, 0.5), 
-  # survival
-  z = z.inits
-  # mus = runif(8),
-  # betas = runif(8,-0.5, 0.5), 
-  # N=N,
-  # NFY = datl$counts.marked[1,],
-  # NF = datl$counts.marked[2,],
-  # NB = datl$counts.marked[3,]
-) }
-
-save(datl, constl, par_info, inits.func, z,
+save(datl, constl, par_info, inits.func1, z, seeds,
      file="data\\data.rdata")
 
 #*********************
@@ -749,3 +762,16 @@ sum(FYA)
 sum(FYB2)
 sum(AB)
 sum(BA)
+
+
+# Why are there nearly double the number of territories
+# compared to counts of female breeders? 
+# Data are subset to females only for both. 
+# Detection is >0.9 for breeders
+par(mfrow=c(1,2))
+plot(datl$counts[3,,1], constl$nest.end[,1], type="n", 
+     xlab="Number of female breeders", ylab=c("Number of territories"))
+text(datl$counts[3,,1], constl$nest.end[,1], 2011:2023)
+plot(datl$counts[3,,2], constl$nest.end[,2], type="n", 
+     xlab="Number of female breeders", ylab=c("Number of territories"))
+text(datl$counts[3,,2], constl$nest.end[,2], 2011:2023)
