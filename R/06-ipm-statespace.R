@@ -98,9 +98,9 @@ mycode <- nimbleCode(
       f[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.f[k])
       log(mu.f[k]) <- lmu.f[site.nest[k]] +  
-                      gamma*treat.nest[k] + 
-                      eps[9, year.nest[k] ] + 
-                      eta[9, site.nest[k], year.nest[k] ] 
+        gamma*treat.nest[k] + 
+        eps[9, year.nest[k] ] + 
+        eta[9, site.nest[k], year.nest[k] ] 
     } # k
     # derive yearly brood size for population model
     for (t in 1:nyr){
@@ -154,7 +154,7 @@ mycode <- nimbleCode(
         ## Adult breeders
         N[6, t+1, s] ~ dbin(mn.phiA[t, s]*mn.psiAB[t, s], NF[t, s]) # Nonbreeder to breeder
         N[7, t+1, s] ~ dbin(mn.phiB[t, s]*(1-mn.psiBA[t, s]), NB[t, s]) # Breeder to breeder
-        }} # s t
+      }} # s t
     
     # Observation process    
     for (t in 1:nyr){
@@ -402,7 +402,7 @@ run_ipm <- function(info, datl, constl, code){
   #n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
   #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
   #n.chains=1; n.thin=10; n.iter=20000; n.burnin=10000
-  n.chains=1; n.thin=250; n.iter=500000; n.burnin=250000
+  n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
   
   mod <- nimbleModel(code, 
                      constants = constl, 

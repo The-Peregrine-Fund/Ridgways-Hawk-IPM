@@ -1,0 +1,52 @@
+---
+title: "Workflow for Ridgway's Hawk NON-Integrated Population Model"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index-simp.html'))})
+author: "Brian W. Rolek"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  github_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/modelcheck-simp.R')
+```
+
+# Model estimates
+```{r,setup, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+Plot model estimates of demographic rates. Life Stages are abbreviated as B = breeder, NB = nonbreeder, FY = first year. First-year abundance accounts for translocated birds. 
+# Print parameter estimates
+Parameter estimates for input into a population viability analysis.
+
+```{r,catplots, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+# Fecundity
+```{r,fecundity, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+# Print parameter estimates
+Parameter estimates for input into a population viability analysis.
+
+```{r,tables, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+# Model diagnostics
+```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,fit, eval=TRUE, warning=FALSE, message=FALSE}
+```

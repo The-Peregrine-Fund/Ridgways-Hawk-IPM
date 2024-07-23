@@ -1,6 +1,6 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace2.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -28,6 +28,7 @@ out <- out[!NAlist]
 post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
 
+!NAlist
 #### ---- pltfunction -------
 # default settings for plots 
 plt  <- function(object, params,...) {
@@ -58,7 +59,8 @@ plt(object=out,
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
 plot(2011:2023, datl$counts[2,,1], 
-     ylab="Counts", type="b")
+     ylab="Counts", type="b",
+     main= "Ignore this fig. OLD DATA")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -67,7 +69,8 @@ plt(object=out,
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
 plot(2011:2023, datl$counts[3,,1], 
-     ylab="Counts", type="b")
+     ylab="Counts", type="b",
+     main= "Ignore this fig. OLD DATA")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -379,7 +382,24 @@ MCMCsummary(post2, params = c(sds, sds2),
 # Transition from breeder to nonbreeder = mus[6,]
 # Detection probability of nonbreeders = mus[7,]
 # Detection probability of breeders
-MCMCsummary(post2, params = pars1[3:4], 
+# modeled as logit(probability) = lmus[x,site] + betas[x]*translocated + eps[x,t] + eta[x,s,t]
+# except breeder to nonbreeder recruitment = lmus[6,site] 
+MCMCsummary(post2, params = pars1[3], 
+            digits=3, HPD = T, 
+            hpd_prob = 0.80, pg0= TRUE)
+
+MCMCsummary(post2, params = "lmus", 
+            digits=3, HPD = T, 
+            hpd_prob = 0.80, pg0= TRUE)
+
+MCMCsummary(post2, params = pars1[4], 
+            digits=3, HPD = T, 
+            hpd_prob = 0.80, pg0= TRUE)
+
+# Fecundity
+# modeled as log(f) = lmu.f[site] + gamma*treatment + eps[x,t] + eta[x,s,t]
+# log scale
+MCMCsummary(post2, params = "lmu.f", 
             digits=3, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
 
@@ -394,6 +414,7 @@ MCMCsummary(post2, params = pars1[3:4],
 MCMCsummary(post2, params = pars1[5:8], 
             digits=2, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
+
 MCMCsummary(post2, params = pars1[9:16], 
             digits=2, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
@@ -407,8 +428,8 @@ MCMCsummary(post2, params = "R2",
             hpd_prob = 0.80, pg0= TRUE)
 
 #### ---- traceplots ------
-MCMCtrace(post2, pdf=FALSE, params= sds, exact=TRUE, ISB=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= sds2, exact=TRUE, ISB=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "sds")
+MCMCtrace(post2, pdf=FALSE, params= "sds2")
 MCMCtrace(post2, pdf=FALSE, params= "mus")
 MCMCtrace(post2, pdf=FALSE, params= "betas")
 MCMCtrace(post2, pdf=FALSE, params= "NF")
@@ -457,17 +478,23 @@ fit.check <- function(out, ratio=FALSE,
 
 # check goodness-of-fit for brood size
 # breeder, ind=1
-fit.check(out, ratio=F,
+# fit.check(out, ratio=F,
+#           name.rep="dmape.rep", 
+#           name.obs="dmape.obs",
+#           ind=1,
+#           lab="Breeder counts- Poisson", jit=300)
+# # nonbreeder, ind=2
+# fit.check(out, ratio=F,
+#           name.rep="dmape.rep", 
+#           name.obs="dmape.obs",
+#           ind=2,
+#           lab="Nonbreeder counts- Poisson", jit=300)
+
+fit.check(out, ratio=T,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=1,
-          lab="Breeder counts- Poisson", jit=300)
-# nonbreeder, ind=2
-fit.check(out, ratio=F,
-          name.rep="dmape.rep", 
-          name.obs="dmape.obs",
-          ind=2,
-          lab="Breeder counts- Poisson", jit=300)
+          lab="Adults(Breeder+Nonbreeder)- Poisson\nFIT STATS WRONG HERE RERUN", jit=300)
 # first-year, ind=3
 # poisson failed fit test bp=0
 # Currently running models to try and fix

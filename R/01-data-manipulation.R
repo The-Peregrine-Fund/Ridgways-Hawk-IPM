@@ -444,8 +444,8 @@ pPrior[1:s.end[2],2] <- pp2
 #**********************
 datl <- list( # productivity data
               f = lp$fledged,
-              brood = as.numeric(lb$brood),
-              nest.success = lp$nestsuccess,
+              # brood = as.numeric(lb$brood),
+              # nest.success = lp$nestsuccess,
               # survival data
               y = y,
               #z = z, 
@@ -453,6 +453,9 @@ datl <- list( # productivity data
               mu.zeroes2 = rep(0,p2),
               # count data
               counts = counts[,,1:2],
+              countsAdults = t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
+                                              3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
+                                            nrow=2, byrow=TRUE)),
               constraint_data = array(1, dim=c(nyr, nsite-1))
               )
 
@@ -472,14 +475,14 @@ constl <- list( # survival
                 nest.end = nest.end,
                 site.nest = lp$site2,
                 
-                treat.brood = lb$treat,
-                nbrood = nrow(lb),
-                year.brood = lb$year2, 
-                yrind.brood = yrind.brood,
-                brood.end = brood.end,
-                mintrunc = min(lb$brood),
-                maxtrunc = max(lb$brood),
-                site.brood = ,
+                # treat.brood = lb$treat,
+                # nbrood = nrow(lb),
+                # year.brood = lb$year2, 
+                # yrind.brood = yrind.brood,
+                # brood.end = brood.end,
+                # mintrunc = min(lb$brood),
+                # maxtrunc = max(lb$brood),
+                # site.brood = ,
                 
                 pPrior = pPrior,
                 p = p, # number of random yr effects
@@ -597,12 +600,9 @@ t(rUstar)%*%rUstar
 # We need good initial values to prevent chains from getting stuck. 
 # Use results from a non-integrated analysis get better starting values 
 library ('MCMCvis')
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-simp.rdata")
-repro <- MCMCsummary(post, params = c("lmu.brood", "delta",
-                          "sig.brood",
-                          "mu.nest", "gamma"))
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_simp.rdata")
+repro <- MCMCsummary(post, params = c("lmu.f", "gamma", "rr"))
 
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\surv_nimble.Rdata")
 mus <- MCMCsummary(post, params = "mus")
 sds <- MCMCsummary(post, params = "sds")
 sds2 <- MCMCsummary(post, params = "sds2")
@@ -620,22 +620,22 @@ Ustar2 <- cbind(Ustar2, rUstar[1:9,9]) # tack on column including random values
 Ustar2 <- abs(Ustar2)
 diag(Ustar2) <- 1
 
-Ni <- array(0, dim=dim(N))
+Ni <- array(0, dim=c(7, constl$nyr, constl$nsite))
 Ni[1,,1] <- abs(constl$hacked.counts[,1]+3)
 
 inits.func1 <- function (){
   list(  
   # fecundity inits from submodel run
-  lmu.f = c(-2.7, -3.2),
-  gamma = 1.8, 
-  rr = 27,
+  lmu.f = c(repro$mean[1], repro$mean[2]),
+  gamma = repro$mean[3], 
+  rr = repro$mean[4],
   # survival
   z = z.inits, 
   mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
-  sds = c(sds$mean, runif(1)),
+  sds = sds$mean,
   Ustar = Ustar,
-  sds2 = c(sds2$mean, runif(1)),
+  sds2 = sds2$mean,
   Ustar2 = Ustar2,
   # counts
   r = rexp(1)
@@ -657,7 +657,12 @@ par_info <- # allows for different seed for each chain
     list(seed=seeds[7], inits = inits.func1()),
     list(seed=seeds[8], inits = inits.func1()),
     list(seed=seeds[9], inits = inits.func1()),
-    list(seed=seeds[10], inits = inits.func1())
+    list(seed=seeds[10], inits = inits.func1()),
+    list(seed=seeds[11], inits = inits.func1()),
+    list(seed=seeds[12], inits = inits.func1()),
+    list(seed=seeds[13], inits = inits.func1()),
+    list(seed=seeds[14], inits = inits.func1()),
+    list(seed=seeds[15], inits = inits.func1())
   )
 
 save(datl, constl, par_info, inits.func1, z, seeds,
