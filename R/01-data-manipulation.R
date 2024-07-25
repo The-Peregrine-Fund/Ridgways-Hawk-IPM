@@ -620,8 +620,33 @@ Ustar2 <- cbind(Ustar2, rUstar[1:9,9]) # tack on column including random values
 Ustar2 <- abs(Ustar2)
 diag(Ustar2) <- 1
 
-Ni <- array(0, dim=c(7, constl$nyr, constl$nsite))
-Ni[1,,1] <- abs(constl$hacked.counts[,1]+3)
+# Get N inits from prelim runs that worked
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace.rdata")
+out <- list(as.mcmc(post[[1]]), 
+            as.mcmc(post[[2]]), 
+            as.mcmc(post[[3]]),
+            as.mcmc(post[[4]]),
+            as.mcmc(post[[5]]),
+            as.mcmc(post[[6]]),
+            as.mcmc(post[[7]]),
+            as.mcmc(post[[8]]),
+            as.mcmc(post[[9]]),
+            as.mcmc(post[[10]]))
+
+# Identify chains with NAs that 
+# failed to initialize
+NAlist <- c()
+for (i in 1:length(out)){
+  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+}
+# Subset chains to those with good initial values
+out <- out[!NAlist]
+post2 <- post[!NAlist]
+outp <- MCMCpstr(out, type="chains")
+Ni <- outp$N[1:7,1:13,1:2,1]
+
+# Ni <- array(0, dim=c(7, constl$nyr, constl$nsite))
+# Ni[1,,1] <- abs(constl$hacked.counts[,1]+3)
 
 inits.func1 <- function (){
   list(  
@@ -638,7 +663,8 @@ inits.func1 <- function (){
   sds2 = sds2$mean,
   Ustar2 = Ustar2,
   # counts
-  r = rexp(1)
+  r = rexp(1),
+  N = Ni
   )}
 
 
@@ -657,15 +683,60 @@ par_info <- # allows for different seed for each chain
     list(seed=seeds[7], inits = inits.func1()),
     list(seed=seeds[8], inits = inits.func1()),
     list(seed=seeds[9], inits = inits.func1()),
-    list(seed=seeds[10], inits = inits.func1()),
-    list(seed=seeds[11], inits = inits.func1()),
-    list(seed=seeds[12], inits = inits.func1()),
-    list(seed=seeds[13], inits = inits.func1()),
-    list(seed=seeds[14], inits = inits.func1()),
-    list(seed=seeds[15], inits = inits.func1())
+    list(seed=seeds[10], inits = inits.func1())
   )
 
-save(datl, constl, par_info, inits.func1, z, seeds,
+Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
+for (sc in 1:6){
+  Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
+  for (t in nyr:(nyr+100)){
+    Ni.pva[sc, 1:7, t, 1:2] <- Ni[1:7, 13, 1:2]
+}
+}
+
+
+inits.func.pva <- function (){
+  list(  
+    # fecundity inits from submodel run
+    lmu.f = c(repro$mean[1], repro$mean[2]),
+    gamma = repro$mean[3], 
+    rr = repro$mean[4],
+    # survival
+    z = z.inits, 
+    mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
+    betas = betas$mean,
+    sds = sds$mean,
+    Ustar = Ustar,
+    sds2 = sds2$mean,
+    Ustar2 = Ustar2,
+    # counts
+    r = rexp(1),
+    N = Ni.pva
+  )}
+
+
+# set seed for reproducibility
+# then draw random seeds (but reproducible) for each chain
+set.seed(1)
+seeds <- sample(1:1000000, size=10, replace=FALSE)
+par_info_pva <- # allows for different seed for each chain
+  list(
+    list(seed=seeds[1], inits = inits.func.pva()),
+    list(seed=seeds[2], inits = inits.func.pva()),
+    list(seed=seeds[3], inits = inits.func.pva()),
+    list(seed=seeds[4], inits = inits.func.pva()),
+    list(seed=seeds[5], inits = inits.func.pva()),
+    list(seed=seeds[6], inits = inits.func.pva()),
+    list(seed=seeds[7], inits = inits.func.pva()),
+    list(seed=seeds[8], inits = inits.func.pva()),
+    list(seed=seeds[9], inits = inits.func.pva()),
+    list(seed=seeds[10], inits = inits.func.pva())
+  )
+
+save(datl, constl, 
+     par_info, par_info_pva,
+     inits.func1, inits.func1, inits.func.pva, 
+     z, seeds,
      file="data\\data.rdata")
 
 #*********************
@@ -767,16 +838,3 @@ sum(FYA)
 sum(FYB2)
 sum(AB)
 sum(BA)
-
-
-# Why are there nearly double the number of territories
-# compared to counts of female breeders? 
-# Data are subset to females only for both. 
-# Detection is >0.9 for breeders
-par(mfrow=c(1,2))
-plot(datl$counts[3,,1], constl$nest.end[,1], type="n", 
-     xlab="Number of female breeders", ylab=c("Number of territories"))
-text(datl$counts[3,,1], constl$nest.end[,1], 2011:2023)
-plot(datl$counts[3,,2], constl$nest.end[,2], type="n", 
-     xlab="Number of female breeders", ylab=c("Number of territories"))
-text(datl$counts[3,,2], constl$nest.end[,2], 2011:2023)

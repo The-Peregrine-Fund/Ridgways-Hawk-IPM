@@ -15,7 +15,7 @@ out <- list(as.mcmc(post[[1]]),
              as.mcmc(post[[7]]),
              as.mcmc(post[[8]]),
              as.mcmc(post[[9]]),
-             as.mcmc(post[[10]]) )
+             as.mcmc(post[[10]]))
 
 # Identify chains with NAs that 
 # failed to initialize
@@ -42,7 +42,7 @@ plt  <- function(object, params,...) {
 
 #### ---- catplots1 -------
 # Abundance of females at Los Haitises
-par(mfrow=c(4,2))
+par(mfrow=c(5,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("NFY[",1:13, ", 1]"), 
@@ -58,9 +58,7 @@ plt(object=out,
     main="Adult nonbreeder (NB)\n Los Haitises", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[2,,1], 
-     ylab="Counts", type="b",
-     main= "Ignore this fig. OLD DATA")
+plot.new()
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -68,9 +66,16 @@ plt(object=out,
     main="Adult breeder (B)\n Los Haitises", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[3,,1], 
-     ylab="Counts", type="b",
-     main= "Ignore this fig. OLD DATA")
+plot.new()
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NAD[",1:13, ", 1]"), 
+    main="Adult Breeders and Nonbreeders\n Los Haitises", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$countsAdults[,1], 
+     ylab="Counts", type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -82,7 +87,7 @@ plot(2011:2023, colSums(datl$counts[,,1]),
      ylab="Counts", type="b")
 
 # Abundance of females at Punta Cana
-par(mfrow=c(4,2))
+par(mfrow=c(5,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("NFY[",1:13, ", 2]"), 
@@ -98,8 +103,7 @@ plt(object=out,
     main="Adult nonbreeder (NB)\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[2,,2], 
-     ylab="Counts", type="b")
+plot.new()
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -107,7 +111,15 @@ plt(object=out,
     main="Adult breeder (B)\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[3,,2], 
+plot.new()
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("NAD[",1:13, ", 2]"), 
+    main="Adult Breeders and Nonbreeders\n Punta Cana", 
+    labels = 2011:2023,
+    xlab = "Year", ylab= "Abundance")
+plot(2011:2023, datl$countsAdults[,2], 
      ylab="Counts", type="b")
 
 plt(object=out, 
@@ -490,18 +502,18 @@ fit.check <- function(out, ratio=FALSE,
 #           ind=2,
 #           lab="Nonbreeder counts- Poisson", jit=300)
 
-fit.check(out, ratio=T,
+fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=1,
-          lab="Adults(Breeder+Nonbreeder)- Poisson\nFIT STATS WRONG HERE RERUN", jit=300)
-# first-year, ind=3
+          lab="Adults(Breeder+Nonbreeder)- Poisson", jit=300)
+# first-year, ind=2
 # poisson failed fit test bp=0
 # Currently running models to try and fix
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
-          ind=3,
+          ind=2,
           lab="First-year counts\nNeg binomial-Poisson", jit=300)
 # fecundity
 fit.check(out, ratio=F,

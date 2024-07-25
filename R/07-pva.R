@@ -14,6 +14,11 @@ hacked.counts[sc,14:113,1:3] <- c(0, 0, 0, 1, 1, 1)[sc]*cbind(rep(-10, 100), rep
 
 constl$hacked.counts <- hacked.counts
 datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) )
+constl$treat.nest2 <- c(1, 0, 1, 1, 0, 1) # treated or not
+constl$hacked2 <- c(0, 0, 0, 1, 1, 1) # scenario- hacked or not
+
+# index to help add informative priors for transition NB to B
+#constl$j2 <- c(1,2,3,4,5,7,8)
 #################################
 # The model
 ####################################################
@@ -51,20 +56,19 @@ mycode <- nimbleCode(
     for (k in 1:8){ 
       betas[k] ~ dunif(-20, 20)  # prior for coefficients
     } # k
-    # j2 <- c(1,2,3,4,5,7,8)
-    # for (j in 1:7){ 
+    # for (j in 1:7){
     #   for (s in 1:nsite){
     #     lmus[j2[j],s] <- logit(mus[j2[j],s])
     #     mus[j2[j],s] ~ dbeta(1,1) # prior for means
-    #   }}     # m population #s sex #h hacked 
+    #   }}     # m population #s sex #h hacked
     # mus[6,1] ~ dbeta(1,15) # informative prior for transition NB to B
-    # mus[6,2] ~ dbeta(1,1) 
+    # mus[6,2] ~ dbeta(1,1)
     
-    for (j in 1:8){ 
+    for (j in 1:8){
       for (s in 1:nsite){
         lmus[j,s] <- logit(mus[j,s])
         mus[j,s] ~ dbeta(1,1) # prior for means
-      }}     # m population #s sex #h hacked 
+      }}     # m population #s sex #h hacked
     
     # Temporal random effects and correlations among all sites
     for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
@@ -105,6 +109,7 @@ mycode <- nimbleCode(
       for (t in 1:K){
         extinct[sc, t, s] <- equals(Ntot[sc, nyr+t, s], 0)
         extinctAD[sc, t, s] <- equals(NAD[sc, nyr+t, s], 0)
+        extinctB[sc, t, s] <- equals(NB[sc, nyr+t, s], 0)
       }}
     } # sc
     
@@ -134,38 +139,43 @@ mycode <- nimbleCode(
         for (xxx in 1:nest.end[t,s]){
           fecmat[t,s,xxx] <- mu.f[ yrind.nest[xxx,t,s] ]
         } # xxx
-        for(sc in 1:6){
-        mn.f[sc,t,s] <- mean( fecmat[t,s,1:nest.end[t,s]] )
+        mn.f[1,t,s] <- mean( fecmat[t,s,1:nest.end[t,s]] )
+        for(sc in 2:6){
+          mn.f[sc,t,s] <- mn.f[1,t,s]
       }}} # s t
     # Future fecundity
 
       for(sc in 1:6){
         for (t in (nyr+1):(nyr+K) ){
-      treat.nest2[sc, t] <- c(1,0,1,1,0,1)[sc] # treated or not
-      for (s in 1:nsite){
+          for (s in 1:nsite){
         # calc percent of nests treated, ifelse so it cannot exceed 100% 
-        perc.treat[sc, t, s] <- step( 1- 10/NB[sc, t, s] ) * 10/NB[sc, t, s] +
-                                (1-step( 1- 10/NB[sc, t, s] ))
+        perc.treat[sc, t, s] <- step( 1- 20/NB[sc, t, s] ) * 20/NB[sc, t, s] +
+                                (1-step( 1- 20/NB[sc, t, s] ))
         log(mn.f[sc,t,s]) <- lmu.f[s] +  
-        gamma*treat.nest2[sc, t]*perc.treat[sc, t, s] + 
-        eps[9, t] + 
-        eta[9, s, t] 
+                              gamma*treat.nest2[sc]*perc.treat[sc, t, s] + 
+                              eps[9, t] + 
+                              eta[9, s, t] 
   }} } # s t sc
     
     ################################
     # Likelihood for counts
     ################################
     # Abundance for year=1
-    for(sc in 1:6){
-    for (v in 1:7){ 
+    for(sc in 1:1){
+      for (v in 1:7){ 
       for (s in 1:nsite){
         # subtract one because to allow dcat to include zero
         N[sc, v, 1, s] <- N2[sc, v, 1, s] - 1 
-        N2[sc, v, 1, s] ~ dcat(pPrior[1:s.end[s], s]) 
+        N2[sc, v, 1, s] ~ dcat(pPrior[1:s.end[s], s])
+        # Assign estimates for years with data to 
+        # all scenarios
+        for (sc2 in 2:6){
+          N[sc2, v, 1, s] <- N[1, v, 1, s]
+        }
       }} # s t
 
     # Abundance for years > 1
-    for (t in 1:(nyr-1+K)){
+    for (t in 1:(nyr-1)){
       for (s in 1:nsite){
         # Number of wild born juvs
         N[sc, 1, t+1, s] ~ dpois( (NFY[sc, t, s]*mn.phiFY[sc, t, s]*mn.psiFYB[sc, t, s] + # first year breeders
@@ -184,8 +194,44 @@ mycode <- nimbleCode(
         ## Adult breeders
         N[sc, 6, t+1, s] ~ dbin(mn.phiA[sc, t, s]*mn.psiAB[sc, t, s], NF[sc, t, s]) # Nonbreeder to breeder
         N[sc, 7, t+1, s] ~ dbin(mn.phiB[sc, t, s]*(1-mn.psiBA[sc, t, s]), NB[sc, t, s]) # Breeder to breeder
-      }} # s t
-  } # sc
+        # Assign estimates for years with data to 
+        # all scenarios
+        for (sc2 in 2:6){
+          N[sc2, 1, t+1, s] <- N[sc, 1, t+1, s]
+          N[sc2, 2, t+1, s] <- N[sc, 2, t+1, s]
+          N[sc2, 3, t+1, s] <- N[sc, 3, t+1, s]
+          N[sc2, 4, t+1, s] <- N[sc, 4, t+1, s]
+          N[sc2, 5, t+1, s] <- N[sc, 5, t+1, s]
+          N[sc2, 6, t+1, s] <- N[sc, 6, t+1, s]
+          N[sc2, 7, t+1, s] <- N[sc, 7, t+1, s]
+        } # sc2
+        }} # s t
+    } # sc
+    
+  # Abundance for years after data collection
+  # PVA portion   
+    for (sc in 1:6){
+      for (t in nyr:(nyr+K-1)){
+        for (s in 1:nsite){
+          # Number of wild born juvs
+          N[sc, 1, t+1, s] ~ dpois( (NFY[sc, t, s]*mn.phiFY[sc, t, s]*mn.psiFYB[sc, t, s] + # first year breeders
+                                       NF[sc, t, s]*mn.phiA[sc, t, s]*mn.psiAB[sc, t, s] + # nonbreeders to breeders
+                                       NB[sc, t, s]*mn.phiB[sc, t, s]*(1-mn.psiBA[sc, t, s])) # breeders remaining
+                                    *mn.f[sc, t+1, s] ) # end Poisson
+          # Abundance of nonbreeders
+          ## Second year nonbreeders
+          N[sc, 2, t+1, s] ~ dbin(mn.phiFY[sc, t, s]*(1-mn.psiFYB[sc, t, s]), NFY[sc, t, s]) # Nestlings to second year nonbreeders
+          ## Adult nonbreeders
+          N[sc, 3, t+1, s] ~ dbin(mn.phiA[sc, t, s]*(1-mn.psiAB[sc, t, s]), NF[sc, t, s]) # Nonbreeders to nonbreeders
+          N[sc, 4, t+1, s] ~ dbin(mn.phiB[sc, t, s]*mn.psiBA[sc, t, s], NB[sc, t, s]) # Breeders to nonbreeders
+          # Abundance of breeders
+          ## Second year breeders
+          N[sc, 5, t+1, s] ~ dbin(mn.phiFY[sc, t, s]*mn.psiFYB[sc, t, s], NFY[sc, t, s]) # Nestlings to second year breeders
+          ## Adult breeders
+          N[sc, 6, t+1, s] ~ dbin(mn.phiA[sc, t, s]*mn.psiAB[sc, t, s], NF[sc, t, s]) # Nonbreeder to breeder
+          N[sc, 7, t+1, s] ~ dbin(mn.phiB[sc, t, s]*(1-mn.psiBA[sc, t, s]), NB[sc, t, s]) # Breeder to breeder
+        }} # s t
+    } # sc
     
     # Observation process 
   for(sc in 1:6){
@@ -199,7 +245,7 @@ mycode <- nimbleCode(
         NAD[sc, t, s] <- NF[sc, t, s] + NB[sc, t, s] # number of adults
         Ntot[sc, t, s] <- sum(N[sc, 1:7, t, s]) # total number of females
       }# s
-    }  }# t
+    }  }# t sc
     
   for(sc in 1:6){
     for (t in 1:nyr){
@@ -272,35 +318,36 @@ mycode <- nimbleCode(
     # Future survival, recruitment, and detection
     for(sc in 1:6){ 
     for (t in (nyr+1):(nyr+K)){
-      hacked2[sc, t] <- c(0, 0, 0, 1, 1, 1)[sc] # scenario- hacked or not
         for (s in 1:nsite){
           # calculate percent hacked
-          # assigns a one if abundance is less than 10
-          perc.hackedFY[sc, t, s] <- step( 1- 10/NFY[sc, t, s] ) * 10/NFY[sc, t, s] +
+          # assigns a one (1.0 or 100%) if abundance is less than 10
+          p.hackedFY[sc, t, s] <- step( 1- 10/NFY[sc, t, s] ) * 10/NFY[sc, t, s] +
                                       (1-step( 1- 10/NFY[sc, t, s] )) 
-          perc.hackedA[sc, t, s] <- step( 1- 10/NF[sc, t, s] ) * 10/NF[sc, t, s] +
+          p.hackedA[sc, t, s] <- step( 1- 10/NF[sc, t, s] ) * 10/NF[sc, t, s] +
                                       (1-step( 1- 10/NF[sc, t, s] ))
-          perc.hackedB[sc, t, s] <- step( 1- 10/NB[sc, t, s] ) * 10/NB[sc, t, s] +
+          p.hackedB[sc, t, s] <- step( 1- 10/NB[sc, t, s] ) * 10/NB[sc, t, s] +
                                       (1-step( 1- 10/NB[sc, t, s] ))
+        # Hacking/translocation only affects birds
+        # moved to Punta Cana (site 2) hence- equals(s, 2)
         #Survival
         logit(mn.phiFY[sc, t, s]) <- eta[1, s, t] + eps[1, t] + 
-          lmus[1, s] + betas[1]*hacked2[sc,t]*perc.hackedFY[sc, t, s]*equals(s, 2)  # first year
+          lmus[1, s] + betas[1]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2)  # first year
         logit(mn.phiA[sc, t, s]) <- eta[2, s, t] + eps[2, t] + 
-          lmus[2, s] +  betas[2]*hacked2[sc,t]*perc.hackedA[sc, t, s]*equals(s, 2) # nonbreeder
+          lmus[2, s] +  betas[2]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder
         logit(mn.phiB[sc, t, s]) <- eta[3, s, t] + eps[3, t] + 
-          lmus[3, s] + betas[3]*hacked2[sc,t]*perc.hackedB[sc, t, s]*equals(s, 2) # breeder
+          lmus[3, s] + betas[3]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # breeder
         #Recruitment
         logit(mn.psiFYB[sc, t, s]) <- eta[4, s, t] + eps[4, t] + 
-          lmus[4, s] + betas[4]*hacked2[sc,t]*perc.hackedFY[sc, t, s]*equals(s, 2) # first year to breeder
+          lmus[4, s] + betas[4]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2) # first year to breeder
         logit(mn.psiAB[sc, t, s]) <- eta[5, s, t] + eps[5, t] + 
-          lmus[5, s] + betas[5]*hacked2[sc,t]*perc.hackedA[sc, t, s]*equals(s, 2) # nonbreeder to breeder
+          lmus[5, s] + betas[5]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder to breeder
         logit(mn.psiBA[sc, t, s]) <- #eta[6, site[i,t],t] + eps[6,t] + 
           lmus[6, s] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
         logit(mn.pA[sc, t, s]) <- eta[7, s, t] + eps[7, t] + 
-          lmus[7, s] + betas[7]*hacked2[sc,t]*perc.hackedA[sc, t, s]*equals(s, 2) # resight of nonbreeders
+          lmus[7, s] + betas[7]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # resight of nonbreeders
         logit(mn.pB[sc, t, s]) <- eta[8, s, t] + eps[8, t] + 
-          lmus[8, s] + betas[8]*hacked2[sc,t]*perc.hackedB[sc, t, s]*equals(s, 2) # resight of breeders
+          lmus[8, s] + betas[8]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # resight of breeders
         } # s
       } # t
     } # sc
@@ -398,12 +445,13 @@ run_ipm <- function(info, datl, constl, code){
     'mn.psiFYB', 'mn.psiAB', 'mn.psiBA',
     'mn.pA', 'mn.pB',
     # pva
-    "extinct", "extinctAD"
+    "extinct", "extinctAD", "extinctB"
+    #"p.hackedFY", "p.hackedA", "p.hackedB"
   )
   
   #n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
   #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-  #n.chains=1; n.thin=10; n.iter=2000; n.burnin=0
+  #n.chains=1; n.thin=1; n.iter=2000; n.burnin=0
   n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
   
   mod <- nimbleModel(code, 
@@ -434,9 +482,9 @@ run_ipm <- function(info, datl, constl, code){
 } # run_ipm function end
 
 
-this_cluster <- makeCluster(15)
+this_cluster <- makeCluster(5)
 post <- parLapply(cl = this_cluster, 
-                  X = par_info, 
+                  X = par_info_pva[1:5], 
                   fun = run_ipm, 
                   datl = datl, 
                   constl = constl, 
@@ -444,7 +492,7 @@ post <- parLapply(cl = this_cluster,
 stopCluster(this_cluster)
 
 save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva1.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva.rdata")
 
 # save(post, mycode,
 #      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace.rdata")

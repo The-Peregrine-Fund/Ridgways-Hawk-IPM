@@ -1,0 +1,94 @@
+---
+title: "Workflow for Ridgway's Hawk Integrated Population Model"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index-pva.html'))})
+author: "Brian W. Rolek"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  github_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Supplemental materials for: Rolek, B.W., McClure, CJW, Dunn, L., Curti, M., ... Ridgway's Hawk IPM and PVA
+
+Contact information: rolek.brian@peregrinefund.org
+
+Metadata, data, and scripts used in analyses can be found at <https://github.com/The-Peregrine-Fund/XXXXX>.
+
+The full workflow below is visible as a html website at:
+<https://the-peregrine-fund.github.io/XXXXX/>.
+
+A permanent archive and DOI is available at: https://zenodo.org/doi/XXXXX
+
+----------------------------------------------------------------------- 
+# Plot model estimates
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/modelcheck-pva.R')
+```
+```{r,setup, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,pltfunction, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+
+Plot model estimates of demographic rates. Life Stages are abbreviated as B = breeder, NB = nonbreeder, FY = first year. First-year abundance accounts for translocated birds. 
+
+```{r,catplots1, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 14)}
+```
+
+Population dynamics are determined by transitions, These transitions between stages are abbreviated as the starting life stage to the final life stage. For example a first-year recruiting to a breeder would be abbreviated as "FY to B". I'll list them here for convenience:
+
+"FY to NB" is first-year to nonbreeder.
+
+"NB to NB" is nonbreeder adult to nonbreeder adult.
+
+"B to NB" is a breeding adult to a nonbreeder adult.
+
+"FY to B" is first-year to breeder.
+
+"NB to B" is nonbreeder adult to breeder adult.
+
+"B to B" is breeder adult to breeder adult.
+
+```{r,catplots2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 14)}
+```
+
+Other parameter estimates. 
+```{r,catplots3, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+# Stage Structure of Each Population
+```{r,popstructure, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+# Print parameter estimates
+Parameter estimates for input into a population viability analysis.
+
+```{r,paramests, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+# Model diagnostics
+
+## Check Goodness-of-fit
+Goodness-of-fit tests provide evidence that statistical distributions adequately describe the data. Here we test fit for brood size and counts. A Bayesian p-value nearest to 0.5 suggests good fitting statistical distributions, while values near 1 or 0 suggest poor fit.
+
+```{r,fit, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+## Examine Traceplots
+Traceplots provide evidence that models adequately converged.
+
+```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
