@@ -22,8 +22,32 @@ library('readxl')
 library ('dplyr')
 library('ggplot2')
 library ('reshape2')
-
+# summaraize field effort
+# for count data
 dfl <- "data\\RIHA data 2011-2023.xlsx"
+effort.dat <- read_excel(dfl, sheet='effort', na=c('') ) 
+effort.dat$surv.days <- effort.dat$`n surveyors`*effort.dat$`n days`
+effort <- data.frame(Year=2011:2023)
+effort <- merge(effort, effort.dat[1:13, c("Year","surv.days")], 
+      by="Year", all.x=TRUE)
+effort <- merge(effort, effort.dat[14:26, c("Year","surv.days")], 
+                by="Year", all.x=TRUE)
+effort <- merge(effort, effort.dat[27:nrow(effort.dat), c("Year","surv.days")], 
+                by="Year", all.x=TRUE)
+colnames(effort) <- c("Year", "surv.days.LH", "surv.days.PC", "surv.days.AV")
+# we scale an offset to the maximum effort recorded
+# at each site
+effort$std.LH <- (effort$surv.days.LH/max(effort$surv.days.LH, na.rm=T))
+effort$std.PC <- (effort$surv.days.PC/max(effort$surv.days.PC, na.rm=T))
+effort$std.AV <- (effort$surv.days.AV/max(effort$surv.days.AV, na.rm=T))
+# impute survey effort=1 at PC and AV
+# because counts are thought to be 
+# complete censuses
+effort$std.PC <- 1
+effort$std.AV <- 1
+
+# Set up banding data for counts and survival
+# individual data
 df <- read_excel(dfl, sheet='Individuals', na=c('#N/A', 'n/a','N/A', '', 'NA', '-') ) 
 df$year.resighted <- as.numeric(df$year.resighted)
 df$origin[ df$origin=="lHNP" ] <- "LHNP"
@@ -39,12 +63,15 @@ df$l.code[df$l.code=="Not recorded"] <- "NR"
 df$l.code[df$l.code=="None"] <- "NB"
 df$ID <- paste(df$l.code, df$r.code, 
                df$`left.color`, df$`right.color`, sep="-")
-# subset
-df <- df[df$sex=="Female",]
+
+#**********************
+#* 2. Counts 
+#**********************
 # remove two fostered birds
 df <- df[df$history !="Foster",]
 #df <- df[df$current.population!="AV",] # remove because small sample size
 df$current.population <- factor(df$current.population, levels= c("LHNP","PC","AV") )
+df$origin <- factor(df$origin, levels= c("LHNP","PC","AV") )
 # separate marked and unmarked birds
 not.banded <- c("NB-NB-NB-NB", "NB-NR-NB-NR", "NR-NR-NR-NR")
 df.unmarked <- df[df$ID %in% not.banded,] # unmarked df
@@ -58,21 +85,54 @@ df.marked.max <- df.marked %>%
   group_by(data.frame(ID, year.resighted)) %>%
   slice(which.max(Stage))
 
-#**********************
-#* 2. Extract counts 
-#**********************
+# Nestlings are not easily sexed
+# so we need to add them all up before subsetting by sex
+# and divide by 2. Assumes an approx equal sex ratio
 # 'B NB N' - 0= Not seen, 1= Nestling, 2=Nonbreeder, 3= Breeder
-counts.marked <- table(df.marked.max$Stage, df.marked.max$year.resighted, df.marked.max$current.population)
+counts.marked.all <- table(df.marked.max$Stage, df.marked.max$year.resighted, df.marked.max$origin)
+counts.unmarked.all <- table(df.unmarked$Stage, df.unmarked$year.resighted, df.unmarked$origin)
+countsFY.all <- counts.marked.all[1,,] + counts.unmarked.all[1,,]
+# plot FYs
+par(mar=c(5, 6, 1, 1), mfrow=c(1,1))
+plot(2011:2023, countsFY.all[,1], type="o", 
+     ylab=c("Count of first-years\n(males+females)"), xlab=c("Year"), 
+     ylim=c(0,max(countsFY.all[,1])))
+lines(2011:2023, countsFY.all[,2], type="o", lty=2, pch=2)
+legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
 
-counts.unmarked <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$current.population)
-dimnames(counts.marked)[[1]] <- c('nestling', 'nonbreeder', 'breeder')
-dimnames(counts.unmarked)[[1]] <- c('nonbreeder', 'breeder')
+# replot with duplicated bands
+# all NR-NR-NR-NR, NB-NB-NB-NB, and NB-NR-NB-NR
+# where NR means "not recorded" and NB means "not banded"
+# counts.unmarked.all.nd <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$origin)
+# countsFY.all.nd <- counts.marked.all[1,,] + counts.unmarked.all.nd[1,,]
+# # plot FYs
+# plot(2011:2023, countsFY.all.nd[,1], type="o", 
+#      ylab=c("Count of first-years\n(males+females)"), xlab=c("Year"), 
+#      ylim=c(0,max(countsFY.all.nd[,1])))
+# lines(2011:2023, countsFY.all.nd[,2], type="o", lty=2, pch=2)
+# legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
+# Extract count data from Google Sheet- Adult RIHA per year_location
+countsAD <- t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
+                       3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
+                     nrow=2, byrow=TRUE))
+# 'B NB N' - 0= Not seen, 1= Nestling, 2=Nonbreeder, 3= Breeder
+df.marked.max <- df.marked.max[df.marked.max$sex=="Female", ]
+# counts.marked <- table(df.marked.max$Stage, df.marked.max$year.resighted, df.marked.max$current.population)
+# 
+# df.unmarked.nodups <- df.unmarked.nodups[df.unmarked.nodups$sex=="Female",]
+# counts.unmarked <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$current.population)
+# dimnames(counts.marked)[[1]] <- c('nestling', 'nonbreeder', 'breeder')
+# dimnames(counts.unmarked)[[1]] <- c('nonbreeder', 'breeder')
 
+# subset to females
+df <- df[df$sex=="Female",]
 #**********************
 #* 3. Territory occupancy 
 #**********************
 # maybe needs work
 # data missing zeroes for surveyed but unoccupied sites
+# not used in IPM but possibly useful for 
+# later analyses
 occ <- tapply(df$territory.name, list(df$territory.name, df$year.resighted), 
        function(x) {ifelse(length(x)>0,1,NA)}, default=NA)
 occ <- occ[order( as.numeric(rownames(occ)) ), ]
@@ -88,14 +148,14 @@ occ <- occ[order( as.numeric(rownames(occ)) ), ]
 # Cutoff dates for annual cycle
 fyr <- min(df.marked.max$year.resighted, na.rm=T)
 lyr <- max(df.marked.max$year.resighted, na.rm=T)
-df.cut <- data.frame(
-  start = paste0(fyr:(lyr-1), "-07-14"), # cutoffs around first fledging
-  end = paste0((fyr+1):lyr, "-07-14"),
-  nms = paste0("Y", fyr:(lyr-1),"_", (fyr+1):lyr) )
-df.cut$yr_int <- df.cut$start %--% df.cut$end 
-
 nyr <- lyr-fyr+1
 nsite <- length(unique(df$current.population))
+# df.cut <- data.frame(
+#   start = paste0(fyr:(lyr-1), "-07-14"), # cutoffs around first fledging
+#   end = paste0((fyr+1):lyr, "-07-14"),
+#   nms = paste0("Y", fyr:(lyr-1),"_", (fyr+1):lyr) )
+# df.cut$yr_int <- df.cut$start %--% df.cut$end 
+
 #**********************
 #* 3. Mark-recapture/resight ----
 #**********************
@@ -173,7 +233,7 @@ lpop <- melt(pop)
 colnames(lpop) <- c("ID", "year", "site")
 lpop$year2 <- lpop$year-2010
 surv.end <- table(lpop$year2, lpop$site)
-yrind.surv <- array(NA, dim = c(max(surv.end), nyr, nsite-1) )
+yrind.surv <- array(NA, dim = c(max(surv.end), nyr, nsite) )
 for (t in 1:nyr){
   for (s in 1:(nsite-1)){
     spop <- pop[,t]
@@ -327,6 +387,7 @@ treatPC <- treat[rownames(treat) %in% keepersPC,]
 plot(2011:2023, colSums(treatPC, na.rm=T), 
      type="b", xlab="Year", ylab="Number treated",
      main="Punta Cana")
+
 #**********************
 #* 8. Hacked birds ----
 #**********************
@@ -347,7 +408,8 @@ df.hacked <- df[df$history == "Hack" & df$Stage==1,]
 hacked.to <- tapply(df.hacked$ID, list(df.hacked$year.resighted, df.hacked$current.population), length, default=0)
 hacked.from <- tapply(df.hacked$ID, list(df.hacked$year.resighted, df.hacked$origin), length, default=0)
 hacked <- data.frame(yr=2011:2023)
-hacked <- merge(hacked, hacked.from, by.x="yr", by.y=0, all.x=T)
+hacked <- merge(hacked, hacked.from[,1], by.x="yr", by.y=0, all.x=T)
+colnames(hacked)[2] <- "LHNP"
 hacked <- merge(hacked, hacked.to[, c(2,3)], by.x="yr", by.y=0, all.x=T)
 hacked[is.na(hacked$LHNP),"LHNP"] <- 0
 hacked[is.na(hacked$PC),"PC"] <- 0
@@ -378,7 +440,11 @@ names(hacked.cov.survival) <-  rownames(y)
 
 # check for changes in hacked status over time to
 # check data
-tapply(dfm$history, list(dfm$ID, dfm$year.resighted), min)
+hsurv <- tapply(dfm$history, list(dfm$ID, dfm$year.resighted), min)
+both.func <- function(x){ any(x=="Hack") & any(x=="Wild")}
+hind <- apply(hsurv, 1, both.func)
+hind <- ifelse(is.na(hind), FALSE, hind)
+hsurv[hind,]
 
 #**********************
 #* 9. Fostered ----
@@ -391,20 +457,7 @@ tapply(dfm$history, list(dfm$ID, dfm$year.resighted), min)
 #* 10. Covariates ----
 #**********************
 p <- p2 <- 9
-counts <- array(NA, dim=dim(counts.marked), dimnames=dimnames(counts.marked))
-counts[1,,] <- counts.marked[1, , ]
-counts[c(2,3),,] <- counts.marked[c(2,3), ,] + counts.unmarked[c(1,2), ,]
-#########################################
-# FY hacked birds need to be moved from PC back 
-# to LHNP where they were born
-# and subtracted from PC
 
-# add to LHNP
-counts[1,,1] <- counts[1,,1] + hacked$LHNP*-1
-# subtract from PC
-counts[1,,2] <- counts[1,,2] - hacked$PC
-# subtract from AV
-counts[1,,3] <- counts[1,,3] - hacked$AV
 #####################################
 # from IPMbook package
 dUnif <- function (lower, upper) 
@@ -418,9 +471,9 @@ dUnif <- function (lower, upper)
   return(drop(out))
 }
 
-mxall <- max(counts)*5
+mxall <- max(countsAD)*3
 pPrior <- array(NA, dim=c(mxall,2))
-s.end <- c(max(counts[,,1])*5, max(counts[,,2])*5 )
+s.end <- c(max(countsAD[,1])*3, max(countsAD[,2])*3 )
 pp1 <- dUnif(1, s.end[1])
 pp2 <- dUnif(1, s.end[2])
 pPrior[1:s.end[1],1] <- pp1
@@ -452,10 +505,8 @@ datl <- list( # productivity data
               mu.zeroes = rep(0,p),
               mu.zeroes2 = rep(0,p2),
               # count data
-              counts = counts[,,1:2],
-              countsAdults = t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
-                                              3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
-                                            nrow=2, byrow=TRUE)),
+              countsAdults = countsAD,
+              countsFY = round(countsFY.all[, 1:2]/2),
               constraint_data = array(1, dim=c(nyr, nsite-1))
               )
 
@@ -496,7 +547,8 @@ constl <- list( # survival
                 ha.ind2 = ha.mat2,
                 ha.end2 = c(13,7,9),
                 hacked.removed = hr, 
-                hacked.counts = as.matrix( hacked[,-1] )
+                hacked.counts = as.matrix( hacked[,-1] ),
+                effort = data.frame(effort$std.LH, effort$std.PC, row.names=effort$Year)
 )
 
 #*******************
@@ -609,14 +661,14 @@ sds2 <- MCMCsummary(post, params = "sds2")
 betas <- MCMCsummary(post, params = "betas")
 u <- MCMCpstr(post, "Ustar", type="chains")
 Ustar <- apply(u$Ustar, c(1,2), mean)
-Ustar <- rbind(Ustar, rUstar[9,1:8]) # tack on one row
-Ustar <- cbind(Ustar, rUstar[1:9,9]) # tack on column including random values
+#Ustar <- rbind(Ustar, rUstar[9,1:8]) # tack on one row
+#Ustar <- cbind(Ustar, rUstar[1:9,9]) # tack on column including random values
 Ustar <- abs(Ustar)
 diag(Ustar) <- 1
 u2 <- MCMCpstr(post, "Ustar2", type="chains")
 Ustar2 <- apply(u2$Ustar2, c(1,2), mean)
-Ustar2 <- rbind(Ustar2, rUstar[9,1:8]) # tack on one row
-Ustar2 <- cbind(Ustar2, rUstar[1:9,9]) # tack on column including random values
+#Ustar2 <- rbind(Ustar2, rUstar[9,1:8]) # tack on one row
+#Ustar2 <- cbind(Ustar2, rUstar[1:9,9]) # tack on column including random values
 Ustar2 <- abs(Ustar2)
 diag(Ustar2) <- 1
 
@@ -686,6 +738,25 @@ par_info <- # allows for different seed for each chain
     list(seed=seeds[10], inits = inits.func1())
   )
 
+# Get inits from IPM output
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm.rdata")
+out <- list(as.mcmc(post[[1]]), 
+            as.mcmc(post[[2]]), 
+            as.mcmc(post[[3]]),
+            as.mcmc(post[[4]]),
+            as.mcmc(post[[5]]))
+
+# Identify chains with NAs that 
+# failed to initialize
+NAlist <- c()
+for (i in 1:length(out)){
+  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+}
+# Subset chains to those with good initial values
+out <- out[!NAlist]
+post2 <- post[!NAlist]
+outp <- MCMCpstr(out, type="chains")
+Ni <- outp$N[1:7,1:13,1:2,1]
 Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
 for (sc in 1:6){
   Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
@@ -693,7 +764,6 @@ for (sc in 1:6){
     Ni.pva[sc, 1:7, t, 1:2] <- Ni[1:7, 13, 1:2]
 }
 }
-
 
 inits.func.pva <- function (){
   list(  
@@ -710,8 +780,8 @@ inits.func.pva <- function (){
     sds2 = sds2$mean,
     Ustar2 = Ustar2,
     # counts
-    r = rexp(1),
-    N = Ni.pva
+    r = rexp(1)
+    #N = Ni.pva
   )}
 
 
@@ -744,8 +814,8 @@ save(datl, constl,
 #*********************
 
 # Check count data
-colSums(counts.marked[2:3,,1]) + colSums(counts.marked[2:3,,1])
-colSums(counts.marked[2:3,,2]) + colSums(counts.marked[2:3,,2])
+#colSums(counts.marked[2:3,,1]) + colSums(counts.marked[2:3,,1])
+#colSums(counts.marked[2:3,,2]) + colSums(counts.marked[2:3,,2])
 #colSums(counts.marked[2:3,,3]) + colSums(counts.marked[2:3,,3])
 colSums(table(df$ID, df$year.resighted))
 

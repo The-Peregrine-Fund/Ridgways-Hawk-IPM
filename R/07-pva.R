@@ -148,9 +148,9 @@ mycode <- nimbleCode(
       for(sc in 1:6){
         for (t in (nyr+1):(nyr+K) ){
           for (s in 1:nsite){
-        # calc percent of nests treated, ifelse so it cannot exceed 100% 
-        perc.treat[sc, t, s] <- step( 1- 20/NB[sc, t, s] ) * 20/NB[sc, t, s] +
-                                (1-step( 1- 20/NB[sc, t, s] ))
+        # calc percent of nests treated so it cannot exceed 100% 
+        perc.treat[sc, t, s] <- step( 1- 10/NB[sc, t, s] ) * 10/NB[sc, t, s] +
+                                (1-step( 1- 10/NB[sc, t, s] ))
         log(mn.f[sc,t,s]) <- lmu.f[s] +  
                               gamma*treat.nest2[sc]*perc.treat[sc, t, s] + 
                               eps[9, t] + 
@@ -238,8 +238,9 @@ mycode <- nimbleCode(
     for (t in 1:(nyr+K)){
       for (s in 1:nsite){
         # constrain N1+hacked.counts to be >=0
-        constraint_data[t, s] ~ dconstraint( (N[sc, 1, t, s] + hacked.counts[sc, t, s]) >= 0 ) # Transfers translocated first-year females
-        NFY[sc, t, s] <- N[sc, 1, t, s] + hacked.counts[sc, t, s] # Transfers translocated first-year females
+        NFY[sc, t, s] <- step( (N[sc, 1, t, s] + hacked.counts[sc, t, s]) ) * (N[sc, 1, t, s] + hacked.counts[sc, t, s]) 
+        #constraint_data[t, s] ~ dconstraint( (N[sc, 1, t, s] + hacked.counts[sc, t, s]) >= 0 ) # Transfers translocated first-year females
+        #NFY[sc, t, s] <- N[sc, 1, t, s] + hacked.counts[sc, t, s] # Transfers translocated first-year females
         NF[sc, t, s] <- sum(N[sc, 2:4, t, s]) # number of adult nonbreeder females
         NB[sc, t, s] <- sum(N[sc, 5:7, t, s]) # number of adult breeder females
         NAD[sc, t, s] <- NF[sc, t, s] + NB[sc, t, s] # number of adults
@@ -451,8 +452,8 @@ run_ipm <- function(info, datl, constl, code){
   
   #n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
   #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-  #n.chains=1; n.thin=1; n.iter=2000; n.burnin=0
-  n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
+  n.chains=1; n.thin=1; n.iter=2000; n.burnin=0
+  #n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
   
   mod <- nimbleModel(code, 
                      constants = constl, 

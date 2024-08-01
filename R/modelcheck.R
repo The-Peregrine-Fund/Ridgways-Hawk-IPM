@@ -1,6 +1,6 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace2.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm1.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -10,12 +10,12 @@ out <- list(as.mcmc(post[[1]]),
              as.mcmc(post[[2]]), 
              as.mcmc(post[[3]]),
              as.mcmc(post[[4]]),
-             as.mcmc(post[[5]]),
-             as.mcmc(post[[6]]),
-             as.mcmc(post[[7]]),
-             as.mcmc(post[[8]]),
-             as.mcmc(post[[9]]),
-             as.mcmc(post[[10]]))
+             as.mcmc(post[[5]]) ) #,
+             # as.mcmc(post[[6]]),
+             # as.mcmc(post[[7]]),
+             # as.mcmc(post[[8]]),
+             # as.mcmc(post[[9]]),
+             # as.mcmc(post[[10]]))
 
 # Identify chains with NAs that 
 # failed to initialize
@@ -46,11 +46,11 @@ par(mfrow=c(5,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("NFY[",1:13, ", 1]"), 
-    main="First-year (FY)\n Los Haitises", 
+    main="First-year (FY) minus hacked\n Los Haitises", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[1,,1]+constl$hacked.counts[,1], 
-     ylab="Counts", type="b")
+plot(2011:2023, datl$countsFY[,1], 
+     ylab="Counts", xlab="Year", type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -75,7 +75,7 @@ plt(object=out,
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
 plot(2011:2023, datl$countsAdults[,1], 
-     ylab="Counts", type="b")
+     ylab="Counts", xlab="Year",  type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -83,19 +83,19 @@ plt(object=out,
     main="All stages\n Los Haitises", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, colSums(datl$counts[,,1]), 
-     ylab="Counts", type="b")
+plot(2011:2023, datl$countsFY[,1]+datl$countsAdults[,1], 
+     ylab="Counts", xlab="Year",  type="b")
 
 # Abundance of females at Punta Cana
 par(mfrow=c(5,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("NFY[",1:13, ", 2]"), 
-    main="First-year (FY)\n Punta Cana", 
+    main="First-year (FY) plus hacked\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[1,,2]+constl$hacked.counts[,2], 
-     ylab="Counts", type="b")
+plot(2011:2023, datl$countsFY[,2], 
+     ylab="Counts", xlab="Year",  type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -120,7 +120,7 @@ plt(object=out,
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
 plot(2011:2023, datl$countsAdults[,2], 
-     ylab="Counts", type="b")
+     ylab="Counts", xlab="Year",  type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
@@ -128,8 +128,8 @@ plt(object=out,
     main="All stages\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, colSums(datl$counts[,,2]), 
-     ylab="Counts", type="b")
+plot(2011:2023, datl$countsFY[,2]+datl$countsAdults[,2], 
+     ylab="Counts", xlab="Year",  type="b")
 
 #### ---- catplots2 -------
 # Finer population segments
@@ -253,6 +253,119 @@ plt(object=out,
              "FY to B", "NB to B", "B to NB",
              "NB detection", "B detection"))
 
+# Get predicted survival, recruitment, and detection
+# with effects from tranlsocation and hacking
+# Birds were only hacked from LHNP to PC here
+# so we only predict values for PC
+pred.mus <- array(NA, dim=c(dim(outp$mus)))
+for (m in c(1,2,3,5,7)){
+    for (tr in 1:2){
+    pred.mus[m,tr,] <- plogis( outp$lmus[m,2,] + outp$betas[m,]*c(0,1)[tr] ) 
+    }}
+# treatment, mu, site, iter
+mus.md <- apply(pred.mus, c(1,2), median)
+mus.HDI80 <- apply(pred.mus, c(1,2), HDInterval::hdi, credMass=0.8)
+mus.HDI95 <- apply(pred.mus, c(1,2), HDInterval::hdi)
+par(mar=c(8,5,1,1), mfrow=c(1,1))
+for (tr in 1:2){
+  if (tr==1){
+plot(1:5+c(-0.1,0.1)[tr], mus.md[c(1,2,3,5,7),tr], 
+     pch=c(16, 17)[tr], cex=2,
+     ylim=c(0,1),
+     xlim=c(0.5, 5.5), 
+     cex.axis=2, cex.lab=2,
+     ylab="Probability", xlab="",
+     main="",
+     xaxt="n", yaxt="n")}
+  else{
+    points(1:5+c(-0.1,0.1)[tr], mus.md[c(1,2,3,5,7),tr], 
+         pch=c(16, 17)[tr], cex=2)
+  }}
+
+axis(1, at=1:5, cex.axis=1.5,
+     labels=c("Survival\nFY", "Survival\nNB", "Survival\nB", 
+               "Recruitment\nNB to B", 
+              "Detection\nNB"), las=2)
+axis(2, at=c(0, 0.25, 0.5, 0.75, 1), cex.axis=2,
+     labels=c(0, NA, 0.5, NA, 1))
+for (m in 1:5){
+for (tr in 1:2){
+lines(rep(c(1:5)[m] + c(-0.1,0.1)[tr],2), mus.HDI95[1:2,c(1,2,3,5,7)[m],tr], lwd=3)
+lines(rep(c(1:5)[m] + c(-0.1,0.1)[tr],2), mus.HDI80[1:2,c(1,2,3,5,7)[m],tr], lwd=6)
+}}
+legend(x=1.15,y=0.4, pch=c(16,17), pt.cex=2, cex=1.5, xpd=NA, horiz=T, 
+       legend=c("Unmanaged", "Translocated" ))
+
+# Fecundity
+par(mfrow=c(1,1))
+plt(object=out, 
+    params=c("lmu.f"), 
+    labels= c("Fecundity\n(log scale)\nLos Haitises",
+              "Fecundity\n(log scale)\nPunta Cana"))
+
+f <- exp(outp$lmu.f)
+f.md <- apply(f, 1, median)
+f.HDI80 <- apply(f, 1, HDInterval::hdi, credMass=0.8)
+f.HDI95 <- apply(f, 1, HDInterval::hdi)
+
+# Calculate treatment effects on fecundity
+f.pred <- array(NA, dim=dim(outp$lmu.f))
+for (s in 1:2){
+  f.pred[s,] <- exp(outp$lmu.f[s,] + outp$gamma[,1])
+} # s
+f2.md <- apply(f.pred, 1, median)
+f2.HDI80 <- apply(f.pred, 1, HDInterval::hdi, credMass=0.8)
+f2.HDI95 <- apply(f.pred, 1, HDInterval::hdi)
+
+par(mar=c(6,5,1,1))
+plot(c(1, 2)-0.1, f.md, 
+     pch=16, cex=3,
+     ylim=c(min(f.HDI95), max(f2.HDI95)),
+     xlim=c(0.5, 2.5), 
+     ylab="Fecundity", xlab="",
+     main="",
+     cex.axis=2, cex.lab=2,
+     xaxt="n", yaxt="n")
+axis(1, at=c(1,2), cex.axis=2,
+     labels=c("Los Haitises\nNational Park","Punta Cana"),
+     padj=1)
+axis(2, at=c(0, 0.2, 0.4, 0.6, 0.8), cex.axis=2,
+     labels=c(0, NA, 0.4, NA, 0.8))
+lines(c(1,1)-0.1, f.HDI95[,1], lwd=3)
+lines(c(2,2)-0.1, f.HDI95[,2], lwd=3)
+lines(c(1,1)-0.1, f.HDI80[,1], lwd=6)
+lines(c(2,2)-0.1, f.HDI80[,2], lwd=6)
+
+points(c(1.1, 2.1), f2.md, 
+     pch=17, cex=3)
+
+lines(c(1,1) +0.1, f2.HDI95[,1], lwd=3)
+lines(c(2,2) +0.1, f2.HDI95[,2], lwd=3)
+lines(c(1,1) +0.1, f2.HDI80[,1], lwd=6)
+lines(c(2,2) +0.1, f2.HDI80[,2], lwd=6)
+legend(x=1.9,y=0.8, pch=c(16,17), pt.cex=3, cex=1.5,
+       legend=c("Untreated", "Treated" ) )
+
+# Is fecundity at LHNP greater than PC
+par(mfrow=c(1,1))
+fdiff <- f[1,]-f[2,]
+hist(fdiff, main="Fecundity difference\nbetween untreated sites")
+# pd=
+mean(fdiff>0)
+
+# How big are the treatment effects on fecundity at each site
+median(f.pred[1,]/f[1,])
+median(f.pred[2,]/f[2,])
+
+
+# gamma = nest treatment effect on fecundity
+par(mfrow=c(1,1))
+plt(object=out, 
+    params=c("gamma"), 
+    main="Anti-Parasitic Fly\nTreatment Effects", ylim=c(0,3))
+
+
+
 
 par(mfrow=c(1,1))
 sds <- paste0("sds[", 1:9, "]")
@@ -281,28 +394,23 @@ for (i in 1:(nrow(outp$R)-1)){
   R2s[ind] <- paste0("R2[",i,", ", j, "]")
   ind <- ind+1
   }}
-par(mfrow=c(1,1))
-plt(object=out, params=Rs, exact=TRUE, ISB=FALSE, 
+par(mfrow=c(2,1))
+plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time (synchrony)",
     xlab = "Rhos", guide_lines=TRUE)
-plt(object=out, params=R2s, exact=TRUE, ISB=FALSE, 
+plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE, 
+    main="Correlations btw demographic rates\n over time (synchrony), continued...",
+    xlab = "Rhos", guide_lines=TRUE)
+par(mfrow=c(2,1))
+plt(object=out, params=R2s[1:18], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites",
     xlab = "Rhos", guide_lines=TRUE)
-# lmu.brood = mean brood size (log scale), 
-# sig.brood = SD among nests
-# mu.nest = mean nest success
-par(mfrow=c(1,1))
-plt(object=out, 
-    params=c("lmu.f"), 
-    labels= c("Fecundity\n(log scale)\nLos Haitises",
-              "Fecundity\n(log scale)\nPunta Cana"))
-
-# gamma = nest treatment effect on fecundity
-plt(object=out, 
-    params=c("gamma"), 
-    main="Anti-Parasitic Fly\nTreatment Effects", ylim=c(0,3))
+plt(object=out, params=R2s[19:36], exact=TRUE, ISB=FALSE, 
+    main="Correlations btw demographic rates\n over time and sites, continued ...",
+    xlab = "Rhos", guide_lines=TRUE)
 
 # Annual averages for integration into the population model
+par(mfrow=c(1,1))
 labs <- c(paste0("LH ",2011:2023), paste0("PC ",2011:2023))
 plt(object=out, params="mn.phiFY", ylim=c(0,1),
     main="First-year survival", labels = labs,
@@ -382,7 +490,8 @@ pars1 <- c("sds", "sds2","mus", "betas",
 MCMCsummary(post2, params = c(sds, sds2), 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 # Mus are means for 
 # mus[1, site] , where site=1 is LH and site=2 is PC
@@ -398,22 +507,26 @@ MCMCsummary(post2, params = c(sds, sds2),
 # except breeder to nonbreeder recruitment = lmus[6,site] 
 MCMCsummary(post2, params = pars1[3], 
             digits=3, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 MCMCsummary(post2, params = "lmus", 
             digits=3, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 MCMCsummary(post2, params = pars1[4], 
             digits=3, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 # Fecundity
 # modeled as log(f) = lmu.f[site] + gamma*treatment + eps[x,t] + eta[x,s,t]
 # log scale
 MCMCsummary(post2, params = "lmu.f", 
             digits=3, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 # Estimates of population size
 # NFY= first year, 
@@ -425,19 +538,25 @@ MCMCsummary(post2, params = "lmu.f",
 # site 1 = LH and site 2=PC
 MCMCsummary(post2, params = pars1[5:8], 
             digits=2, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 MCMCsummary(post2, params = pars1[9:16], 
             digits=2, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 # Correlations among demographic rates time (synchrony)
-MCMCsummary(post2, params = "R", 
+MCMCsummary(post2, params = Rs,
+            exact=TRUE, ISB=FALSE,
             digits=2, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 # Correlations among demographic rates site x time
-MCMCsummary(post2, params = "R2", 
+MCMCsummary(post2, params = R2s, 
+            exact=TRUE, ISB=FALSE,
             digits=2, HPD = T, 
-            hpd_prob = 0.80, pg0= TRUE)
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
 
 #### ---- traceplots ------
 MCMCtrace(post2, pdf=FALSE, params= "sds")

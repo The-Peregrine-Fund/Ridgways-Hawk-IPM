@@ -1,6 +1,6 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva1.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva2.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -10,18 +10,18 @@ out <- list(as.mcmc(post[[1]]),
              as.mcmc(post[[2]]), 
              as.mcmc(post[[3]]),
              as.mcmc(post[[4]]),
-             as.mcmc(post[[5]]),
-             as.mcmc(post[[6]]),
-             as.mcmc(post[[7]]),
-             as.mcmc(post[[8]]),
-             as.mcmc(post[[9]]),
-             as.mcmc(post[[10]]))
+             as.mcmc(post[[5]])) #,
+             # as.mcmc(post[[6]]),
+             # as.mcmc(post[[7]]),
+             # as.mcmc(post[[8]]),
+             # as.mcmc(post[[9]]),
+             # as.mcmc(post[[10]]))
 
 # Identify chains with NAs that 
 # failed to initialize
 NAlist <- c()
 for (i in 1:length(out)){
-  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+  NAlist[i] <- any (is.na(out[[i]][,1:9493]) | out[[i]][,1:9493]<0)
 }
 # Subset chains to those with good initial values
 out <- out[!NAlist]
@@ -42,49 +42,105 @@ plt  <- function(object, params,...) {
 
 #### ---- catplots1 -------
 # Abundance of females at Los Haitises
-par(mfrow=c(5,2))
+par(mfrow=c(3,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("NFY[",1:13, ", 1]"), 
-    main="First-year (FY)\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[1,,1]+constl$hacked.counts[,1], 
-     ylab="Counts", type="b")
-
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NF[",1:13, ", 1]"), 
-    main="Adult nonbreeder (NB)\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plot.new()
-
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NB[",1:13, ", 1]"),
-    main="Adult breeder (B)\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plot.new()
-
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("NAD[",1:13, ", 1]"), 
-    main="Adult Breeders and Nonbreeders\n Los Haitises", 
-    labels = 2011:2023,
-    xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$countsAdults[,1], 
-     ylab="Counts", type="b")
-
-plt(object=out, 
-    exact=TRUE, ISB=FALSE, 
-    params=paste0("Ntot[",1:13, ", 1]"), 
+    params=paste0("extinct[1, ",1:100, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2023,
+    labels = 2024:2123,
+    xlab = "Year", ylab= "Prob. of extinction",
+    ylim=c(0,1))
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("extinct[2, ",1:100, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2024:2123,
+    xlab = "Year", ylab= "Prob. of extinction",
+    ylim=c(0,1))
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("extinct[3, ",1:100, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2024:2123,
+    xlab = "Year", ylab= "Prob. of extinction",
+    ylim=c(0,1))
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("extinct[4, ",1:100, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2024:2123,
+    xlab = "Year", ylab= "Prob. of extinction",
+    ylim=c(0,1))
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("extinct[5, ",1:100, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2024:2123,
+    xlab = "Year", ylab= "Prob. of extinction",
+    ylim=c(0,1))
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("extinct[6, ",1:100, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2024:2123,
+    xlab = "Year", ylab= "Prob. of extinction",
+    ylim=c(0,1))
+
+##########################3
+par(mfrow=c(2,2))
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[1, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, colSums(datl$counts[,,1]), 
-     ylab="Counts", type="b")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[2, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[3, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[4, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[5, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[6, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
+
+# plt(object=out, 
+#     exact=TRUE, ISB=FALSE, 
+#     params=paste0("NB[1, ",1:113, ", 1]"), 
+#     main="Adult Breeder (NB)\n Los Haitises", 
+#     labels = 2011:2123,
+#     xlab = "Year", ylab= "Abundance")
 
 # Abundance of females at Punta Cana
 par(mfrow=c(5,2))

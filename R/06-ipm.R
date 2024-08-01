@@ -168,7 +168,7 @@ mycode <- nimbleCode(
     # Observation process    
     for (t in 1:nyr){
       for (s in 1:nsite){
-        countsAdults[t, s] ~ dpois(NAD[t, s]) # adult females 
+        countsAdults[t, s] ~ dpois(lamAD[t, s]) # adult females 
         # constrain N1+hacked.counts to be >=0
         constraint_data[t, s] ~ dconstraint( (N[1, t, s] + hacked.counts[t, s]) >= 0 ) # Transfers translocated first-year females
         NFY[t, s] <- N[1, t, s] + hacked.counts[t, s] # Transfers translocated first-year females
@@ -176,12 +176,14 @@ mycode <- nimbleCode(
         NB[t, s] <- sum(N[5:7, t, s]) # number of adult breeder females
         NAD[t, s] <- NF[t, s] + NB[t, s] # number of adults
         Ntot[t, s] <- sum(N[1:7, t, s]) # total number of females
-      }# s
+        log(lamAD[t, s]) <- log(NAD[t, s]) + log(effort[t, s])
+        log(lamFY[t, s]) <- log(N[1, t, 1]) + log(effort[t, s])
+        }# s
       # First-years at different sites have different distributions
       # for better model fit
-      counts[1, t, 1] ~ dpois(N[1, t, 1]) # doesn't have any zeroes so poisson
-      counts[1, t, 2] ~ dnegbin(pp[t], r) # first year females, includes translocated/hacked
-      pp[t] <- r/(r+N[1, t, 2])
+      countsFY[t, 1] ~ dpois(lamFY[t, 1]) # doesn't have any zeroes so poisson
+      countsFY[t, 2] ~ dnegbin(pp[t], r) # first year females, includes translocated/hacked
+      pp[t] <- r/(r+(lamFY[t, 2] ))
     } # t
     r ~ dexp(0.05)
     ###################
@@ -191,14 +193,14 @@ mycode <- nimbleCode(
     # Step 3: Use test statistic: number of turns
     ###################
     for (t in 1:nyr){
-      c.repFY[t, 1] ~ dpois( N[1, t, 1] )
+      c.repFY[t, 1] ~ dpois( lamFY[t, 1] )
       c.repFY[t, 2] ~ dnegbin( pp[t], r )
       for (s in 1:nsite){
-        c.expAD[t, s] <- NAD[t, s]  # expected counts adult breeder
-        c.expFY[t, s] <- N[1, t, s]
+        c.expAD[t, s] <- lamAD[t, s]  # expected counts adult breeder
+        c.expFY[t, s] <- lamFY[t, s]
         c.obsAD[t, s] <- countsAdults[t, s]
-        c.obsFY[t, s] <- counts[1, t, s]  # first year
-        c.repAD[t, s] ~ dpois( NAD[t,s] ) # simulated counts
+        c.obsFY[t, s] <- countsFY[t, s]  # first year
+        c.repAD[t, s] ~ dpois( lamAD[t, s] ) # simulated counts
         dssm.obsAD[t, s] <- abs( ( (c.obsAD[t, s]) - (c.expAD[t, s]) ) / (c.obsAD[t, s]+0.001)  )
         dssm.obsFY[t, s] <- abs( ( (c.obsFY[t, s]) - (c.expFY[t, s]) ) / (c.obsFY[t, s]+0.001)  )
         dssm.repAD[t, s] <- abs( ( (c.repAD[t, s]) - (c.expAD[t, s]) ) / (c.repAD[t, s]+0.001) )
