@@ -38,13 +38,21 @@ colnames(effort) <- c("Year", "surv.days.LH", "surv.days.PC", "surv.days.AV")
 # we scale an offset to the maximum effort recorded
 # at each site
 effort$std.LH <- (effort$surv.days.LH/max(effort$surv.days.LH, na.rm=T))
-effort$std.PC <- (effort$surv.days.PC/max(effort$surv.days.PC, na.rm=T))
-effort$std.AV <- (effort$surv.days.AV/max(effort$surv.days.AV, na.rm=T))
+#effort$std.PC <- (effort$surv.days.PC/max(effort$surv.days.PC, na.rm=T))
+#effort$std.AV <- (effort$surv.days.AV/max(effort$surv.days.AV, na.rm=T))
 # impute survey effort=1 at PC and AV
 # because counts are thought to be 
 # complete censuses
 effort$std.PC <- 1
 effort$std.AV <- 1
+
+sdays.LH <- effort$surv.days.LH[5:13] # drop years not used as count data
+# Add another effort covariate centered on zero and scaled
+effort$std2.LH <- c(0,0,0,0, (sdays.LH-mean(sdays.LH, na.rm=T))/sd(sdays.LH, na.rm=T))
+#effort$std2.PC <- (effort$surv.days.PC-mean(effort$surv.days.PC, na.rm=T))/sd(effort$surv.days.PC, na.rm=T)
+#effort$std2.AV <- (effort$surv.days.AV-mean(effort$surv.days.AV, na.rm=T))/sd(effort$surv.days.AV, na.rm=T)
+effort$std2.PC <- 0
+effort$std2.AV <- 0
 
 # Set up banding data for counts and survival
 # individual data
@@ -53,17 +61,23 @@ df$year.resighted <- as.numeric(df$year.resighted)
 df$origin[ df$origin=="lHNP" ] <- "LHNP"
 
 # Reassign bands to abbreviate
-df$right.color[df$right.color=="Not recorded"] <- "NR"
-df$right.color[df$right.color=="No band"] <- "NB"
-df$left.color[df$left.color=="Not recorded"] <- "NR"
-df$left.color[df$left.color=="No band"] <- "NB"
-df$r.code[df$r.code=="Not recorded"] <- "NR"
-df$r.code[df$r.code=="None"] <- "NB"
-df$l.code[df$l.code=="Not recorded"] <- "NR"
-df$l.code[df$l.code=="None"] <- "NB"
-df$ID <- paste(df$l.code, df$r.code, 
-               df$`left.color`, df$`right.color`, sep="-")
-
+nrs <- c("Not recorded", "Ayudanos", "No band", "None", NA)
+df$rcol <- df$right.color
+df$rcol[df$rcol %in% nrs] <- "NR"
+#df$right.color[df$right.color=="No band"] <- "NB"
+df$lcol <- df$left.color
+df$lcol[df$lcol %in% nrs] <- "NR"
+#df$left.color[df$left.color=="No band"] <- "NB"
+df$rcode <- df$r.code
+df$rcode[df$rcode %in% nrs] <- "NR"
+#df$r.code[df$r.code=="None"] <- "NB"
+df$lcode <- df$l.code
+df$lcode[df$lcode %in% nrs] <- "NR"
+#df$l.code[df$l.code=="None"] <- "NB"
+df$ID <- paste(df$lcode, df$rcode, 
+               df$lcol, df$rcol, sep="-")
+ 
+  
 #**********************
 #* 2. Counts 
 #**********************
@@ -100,6 +114,14 @@ plot(2011:2023, countsFY.all[,1], type="o",
 lines(2011:2023, countsFY.all[,2], type="o", lty=2, pch=2)
 legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
 
+# plot effort corrected counts
+par(mar=c(5, 6, 1, 1), mfrow=c(2,1))
+plot(2011:2023, countsFY.all[,1], type="o", 
+     ylab=c("Count of first-years\n(males+females)"), xlab=c("Year"), 
+     ylim=c(0,max(countsFY.all[,1])))
+lines(2011:2023, countsFY.all[,2], type="o", lty=2, pch=2)
+legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
+
 # replot with duplicated bands
 # all NR-NR-NR-NR, NB-NB-NB-NB, and NB-NR-NB-NR
 # where NR means "not recorded" and NB means "not banded"
@@ -112,7 +134,11 @@ legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
 # lines(2011:2023, countsFY.all.nd[,2], type="o", lty=2, pch=2)
 # legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
 # Extract count data from Google Sheet- Adult RIHA per year_location
-countsAD <- t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
+# countsAD <- t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
+#                        3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
+#                      nrow=2, byrow=TRUE))
+countsAD <- t(matrix(c(NA, NA, NA, NA, #72, 190, 235, 250, 
+                       196, 210, 250, 268, 288, 268, 296, 276, 340,
                        3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
                      nrow=2, byrow=TRUE))
 # 'B NB N' - 0= Not seen, 1= Nestling, 2=Nonbreeder, 3= Breeder
@@ -183,6 +209,35 @@ last.year.inds <- rownames(min.yr.ind)[min.yr.ind==lyr]
 dfm <- df.marked.max[!df.marked.max$ID %in% last.year.inds, ]
 # Remove AV birds
 dfm <- dfm[dfm$current.population!="AV", ]
+# data checks
+# Are there big gaps in years of detections?
+# Are there more than two "NRs"?
+check.num <- function (x) { 
+  b <- data.frame(rcol=rep(NA, nrow(x)), lcol=NA, rcode=NA, lcode=NA)
+  b[,1] <- x$rcol=="NR"
+  b[,2] <- x$lcol=="NR"
+  b[,3] <- x$rcode=="NR"
+  b[,4] <- x$lcode=="NR"
+  return (b)
+}
+cnum <- check.num(dfm)
+cnum2 <- rowSums(cnum)
+sum(cnum2>2, na.rm=TRUE)
+# select for birds that are individually identifiable with binocs
+# So they have <=2 bands observed OR the only band is not 
+# an ayudanos band. 
+keep.grthan2 <- cnum2>2 & !(!is.na(as.numeric(dfm$r.code)) | !is.na(as.numeric(dfm$l.code)) )
+#View(dfm[keep.grthan2, "ID"])
+
+dfm <- dfm[cnum2<=2 | keep.grthan2, ]
+# Omit incomplete band IDs
+incomp <- c("NR-NR-Green-NR", "NR-NR-Green-NR")
+dfm <- dfm[!dfm$ID %in% incomp, ]
+
+#Compare with original band assignments
+#ID is ordered as lcode-rcode-lcol-rcol
+#View(dfm[, c("l.code", "r.code", "left.color", "right.color", "ID")])
+# Are there 3 NAs and only an ayudanos band number?
 
 
 nind <- length(unique(dfm$ID))
@@ -225,7 +280,7 @@ for (i in 1:nind){
 
 # did any adult birds switch sites?
 pop[apply(pop, 1, function(x){ y <- min(x); any(x!=y) } ),]
-# none switched
+# none switched unless translocated
 
 pop2 <- pop
 pop2[y==4]
@@ -387,6 +442,14 @@ treatPC <- treat[rownames(treat) %in% keepersPC,]
 plot(2011:2023, colSums(treatPC, na.rm=T), 
      type="b", xlab="Year", ylab="Number treated",
      main="Punta Cana")
+# Plot proportion of nests treated
+plot(2011:2023, colSums(treatLH, na.rm=T)/countsAD[,1], 
+     type="b", xlab="Year", ylab="Proportion treated",
+     main="Los Haitises")
+
+plot(2011:2023, colSums(treatPC, na.rm=T)/countsAD[,2], 
+     type="b", xlab="Year", ylab="Proportion treated",
+     main="Punta Cana")
 
 #**********************
 #* 8. Hacked birds ----
@@ -470,15 +533,57 @@ dUnif <- function (lower, upper)
   for (i in 1:nrow) out[i, A[i]:B[i]] <- rep(1/n[i], n[i])
   return(drop(out))
 }
+# Create vague priors for 
+# adult abundance based on 
+# counts
+multiplier <- 1.5
+mxallAD <- max(countsAD, na.rm=T)*multiplier
+pPriorAD <- array(NA, dim=c(mxallAD,2))
+s.endAD <- c(max(countsAD[,1], na.rm=T)*multiplier, 
+           max(countsAD[,2], na.rm=T)*multiplier )
+s.endAD <- round(s.endAD)
+pp1AD <- dUnif(1, s.endAD[1])
+pp2AD <- dUnif(1, s.endAD[2])
+pPriorAD[1:s.endAD[1],1] <- pp1AD
+pPriorAD[1:s.endAD[2],2] <- pp2AD
+# Create vague priors for 
+# FY abundance based on 
+# counts
+mxallFY <- max(countsFY.all[,1:2])*multiplier
+pPriorFY <- array(NA, dim=c(mxallFY,2))
+s.endFY <- c(max(countsFY.all[,1])*multiplier, 
+             max(countsFY.all[,2])*multiplier )
+s.endFY <- round(s.endFY)
+pp1FY <- dUnif(1, s.endFY[1])
+pp2FY <- dUnif(1, s.endFY[2])
+pPriorFY[1:s.endFY[1],1] <- pp1FY
+pPriorFY[1:s.endFY[2],2] <- pp2FY
+# Combine Adult and FY priors
+# into 1 array
+pPrior <- array(NA, dim=c(7,nrow(pPriorAD),2))
+# N[1,2,5,] are capped by NFY, so it can't exceed
+pPrior[1,1:s.endFY[1],1] <- pPrior[2,1:s.endFY[1],1] <-
+  pPrior[5,1:s.endFY[1],1] <- pp1FY
+pPrior[3,1:s.endAD[1],1] <- pPrior[4,1:s.endAD[1],1] <-  
+  pPrior[6,1:s.endAD[1],1] <- pPrior[7,1:s.endAD[1],1] <- 
+  pp1AD
 
-mxall <- max(countsAD)*3
-pPrior <- array(NA, dim=c(mxall,2))
-s.end <- c(max(countsAD[,1])*3, max(countsAD[,2])*3 )
-pp1 <- dUnif(1, s.end[1])
-pp2 <- dUnif(1, s.end[2])
-pPrior[1:s.end[1],1] <- pp1
-pPrior[1:s.end[2],2] <- pp2
+pPrior[1,1:s.endFY[2],2] <- pPrior[2,1:s.endFY[2],2] <-
+  pPrior[5,1:s.endFY[2],2] <- pp2FY
+pPrior[3,1:s.endAD[2],2] <- pPrior[4,1:s.endAD[2],2] <-
+  pPrior[6,1:s.endAD[2],2] <- pPrior[7,1:s.endAD[2],2] <- 
+  pp2AD
 
+s.end <- array(NA, dim=c(7,2))
+# N[1,2,5,] are capped by NFY
+s.end[1,1] <- s.end[2,1] <- s.end[5,1] <- s.endFY[1]
+# N[3,4,6,7,] are capped by adults
+s.end[3,1] <- s.end[4,1] <-
+   s.end[6,1] <-s.end[7,1] <- s.endAD[1]
+
+s.end[1,2] <- s.end[2,2] <- s.end[5,2] <- s.endFY[2]
+s.end[3,2] <- s.end[4,2] <-
+  s.end[6,2] <-s.end[7,2] <- s.endAD[2]
 # get mean abundance from preliminary run to 
 # include density dependence
 # load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
@@ -548,7 +653,8 @@ constl <- list( # survival
                 ha.end2 = c(13,7,9),
                 hacked.removed = hr, 
                 hacked.counts = as.matrix( hacked[,-1] ),
-                effort = data.frame(effort$std.LH, effort$std.PC, row.names=effort$Year)
+                effort = data.frame(LH=effort$std.LH, PC=effort$std.PC, row.names=effort$Year),
+                effort2 = data.frame(LH=effort$std2.LH, PC=effort$std2.PC, row.names=effort$Year)
 )
 
 #*******************
@@ -590,65 +696,6 @@ diag(rUstar) <- 1 # set diagonal to 1
 rUstar[lower.tri(rUstar)] <- 0 # set lower diag to zero
 t(rUstar)%*%rUstar
 
-# Abundance
-# account for hacked first years
-# c1 <- data.frame(LHNP=counts[1,,1] ,
-#             PC=counts[1,,2] ,
-#             AV=counts[1,,3] )
-# 
-# N1i <- c1
-# NFi <- counts[2,,] 
-# NBi <- counts[3,,]
-
-# In n~binom(p,N) ensure that is always n<N
-# tedious but necessary
-# FYs
-# hs <- rbind(c(0,0,0), constl$hacked.counts[(1:nyr-1),] ) 
-# 
-# N22 <-  floor( (rbind( c(2, 2, 0), round(N1i[1:(nyr-1),]) ) +
-#   hs) /2 )
-# N55 <- N22
-# # Nonbreeders
-# N33 <- floor( rbind( c(4, 4, 0), NFi[1:(nyr-1),]/2 ) )
-# N66 <- rbind( c(10, 10, 0), NFi[1:(nyr-1),])-N33
-# # breeders
-# N77 <- rbind( c(36, 12, 0) , NBi[1:(nyr-1),] )
-#                                 
-# N <- array(NA, dim=c(7, nyr, nsite) )
-# N[1,,] <- as.matrix(c1)
-# N[2,,] <- as.matrix(N22)
-# N[3,,] <- as.matrix(N33)
-# N[4,,] <- 0
-# N[5,,] <- as.matrix(N55)
-# N[6,,] <- as.matrix(N66)
-# N[7,,] <- as.matrix(N77)
-
-# # automate fixing initial values
-# Nfix <- function(N, N1, NF, NB, hack){
-#   Nc <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$Nc
-#   N2 <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$N2
-#   j <- 1
-#   while(any(Nc[2:7, 1:12, 1:3]==FALSE) ) {
-#     Fs <- which(Nc==FALSE, arr.ind=T)
-#     for (i in 1:nrow(Fs)){
-#       j1 <- Fs[i,1]; j2 <- Fs[i,2]; j3 <- Fs[i,3]
-#       if (N[j1, j2+1, j3]>0) {
-#           N[j1, j2+1, j3] <- N2[j1, j2, j3] -1
-#       } else{ N[j1, j2+1, j3] <- 0; next }
-#   } # i
-#     N1 <- N[1,,]
-#     NF <- apply(N[c(2:4),,], c(2,3), sum) + 20
-#     NB <- apply(N[c(5:7),,], c(2,3), sum) + 20
-#     Nc <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$Nc
-#     N2 <- Ncheck(N, N1=N1, NF=NF, NB=NB, hack)$N2
-#     j <- j+1
-# } # while
-#   print(paste0(j, " iterations"))
-#   return(list(Nfixed=N, Ncheck=Nc, N1=N1, NF=NF, NB=NB))
-#   }# Nfix
-# 
-#Nf <- Nfix(N=N, N1=N1i, NF=NFi, NB=NBi, hack=hs)
-
 # We need good initial values to prevent chains from getting stuck. 
 # Use results from a non-integrated analysis get better starting values 
 library ('MCMCvis')
@@ -673,7 +720,9 @@ Ustar2 <- abs(Ustar2)
 diag(Ustar2) <- 1
 
 # Get N inits from prelim runs that worked
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace.rdata")
+# I ran a model with 20 chains 200 posterior iters
+# and got 5 chains that worked.
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_Nprior.rdata")
 out <- list(as.mcmc(post[[1]]), 
             as.mcmc(post[[2]]), 
             as.mcmc(post[[3]]),
@@ -683,7 +732,17 @@ out <- list(as.mcmc(post[[1]]),
             as.mcmc(post[[7]]),
             as.mcmc(post[[8]]),
             as.mcmc(post[[9]]),
-            as.mcmc(post[[10]]))
+            as.mcmc(post[[10]]),
+            as.mcmc(post[[11]]), 
+            as.mcmc(post[[12]]), 
+            as.mcmc(post[[13]]),
+            as.mcmc(post[[14]]),
+            as.mcmc(post[[15]]),
+            as.mcmc(post[[16]]),
+            as.mcmc(post[[17]]),
+            as.mcmc(post[[18]]),
+            as.mcmc(post[[19]]),
+            as.mcmc(post[[20]]))
 
 # Identify chains with NAs that 
 # failed to initialize
@@ -695,10 +754,6 @@ for (i in 1:length(out)){
 out <- out[!NAlist]
 post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
-Ni <- outp$N[1:7,1:13,1:2,1]
-
-# Ni <- array(0, dim=c(7, constl$nyr, constl$nsite))
-# Ni[1,,1] <- abs(constl$hacked.counts[,1]+3)
 
 inits.func1 <- function (){
   list(  
@@ -710,20 +765,24 @@ inits.func1 <- function (){
   z = z.inits, 
   mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
-  sds = sds$mean,
-  Ustar = Ustar,
+  deltas = runif(8, -0.1, 0.1),
+  # sds = sds$mean,
+  # Ustar = Ustar,
   sds2 = sds2$mean,
   Ustar2 = Ustar2,
   # counts
-  r = rexp(1),
-  N = Ni
+  countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
+  r = mean(outp$r),
+  N = outp$N[1:7,1:13,1:2, 
+             sample(c(1, 2001, 4001, 6001, 8001), 1, replace = F)] # sample from inits of chains that worked
+              
   )}
 
 
 # set seed for reproducibility
 # then draw random seeds (but reproducible) for each chain
 set.seed(1)
-seeds <- sample(1:1000000, size=10, replace=FALSE)
+seeds <- sample(1:1000000, size=20, replace=FALSE)
 par_info <- # allows for different seed for each chain
   list(
     list(seed=seeds[1], inits = inits.func1()),
@@ -735,17 +794,20 @@ par_info <- # allows for different seed for each chain
     list(seed=seeds[7], inits = inits.func1()),
     list(seed=seeds[8], inits = inits.func1()),
     list(seed=seeds[9], inits = inits.func1()),
-    list(seed=seeds[10], inits = inits.func1())
+    list(seed=seeds[10], inits = inits.func1()),
+    list(seed=seeds[11], inits = inits.func1()),
+    list(seed=seeds[12], inits = inits.func1()),
+    list(seed=seeds[13], inits = inits.func1()),
+    list(seed=seeds[14], inits = inits.func1()),
+    list(seed=seeds[15], inits = inits.func1()),
+    list(seed=seeds[16], inits = inits.func1()),
+    list(seed=seeds[17], inits = inits.func1()),
+    list(seed=seeds[18], inits = inits.func1()),
+    list(seed=seeds[19], inits = inits.func1()),
+    list(seed=seeds[20], inits = inits.func1())
   )
 
 # Get inits from IPM output
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm.rdata")
-out <- list(as.mcmc(post[[1]]), 
-            as.mcmc(post[[2]]), 
-            as.mcmc(post[[3]]),
-            as.mcmc(post[[4]]),
-            as.mcmc(post[[5]]))
-
 # Identify chains with NAs that 
 # failed to initialize
 NAlist <- c()
@@ -756,14 +818,17 @@ for (i in 1:length(out)){
 out <- out[!NAlist]
 post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
-Ni <- outp$N[1:7,1:13,1:2,1]
-Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
-for (sc in 1:6){
-  Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
-  for (t in nyr:(nyr+100)){
-    Ni.pva[sc, 1:7, t, 1:2] <- Ni[1:7, 13, 1:2]
-}
-}
+Ni.func <- function (){
+    Ni <- outp$N[1:7,1:13,1:2,
+                 sample(c(1, 2001, 4001, 6001, 8001), 1, replace = F)]
+    Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
+    for (sc in 1:6){
+      Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
+      for (t in nyr:(nyr+100)){
+        Ni.pva[sc, 1:7, t, 1:2] <- Ni[1:7, 13, 1:2]
+}} # t sc
+    return(Ni.pva)
+} # function
 
 inits.func.pva <- function (){
   list(  
@@ -775,13 +840,15 @@ inits.func.pva <- function (){
     z = z.inits, 
     mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
     betas = betas$mean,
-    sds = sds$mean,
-    Ustar = Ustar,
+    deltas = runif(8, -1, 1),
+    #sds = sds$mean,
+    #Ustar = Ustar,
     sds2 = sds2$mean,
     Ustar2 = Ustar2,
     # counts
-    r = rexp(1)
-    #N = Ni.pva
+    countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
+    r = mean(outp$r),
+    N = Ni.func()
   )}
 
 

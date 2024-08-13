@@ -72,6 +72,9 @@ Other parameter estimates.
 ```{r,popstructure, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
+# Correlations between population growth rates and demographics
+```{r,popgrowth, eval=TRUE, warning=FALSE, message=FALSE}
+```
 # Print parameter estimates
 Parameter estimates for input into a population viability analysis.
 

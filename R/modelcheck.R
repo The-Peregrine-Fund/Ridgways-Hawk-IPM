@@ -1,21 +1,32 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm1.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
 library ('ggplot2')
 library('reshape2')
+library('bayestestR')
 out <- list(as.mcmc(post[[1]]), 
              as.mcmc(post[[2]]), 
              as.mcmc(post[[3]]),
              as.mcmc(post[[4]]),
-             as.mcmc(post[[5]]) ) #,
-             # as.mcmc(post[[6]]),
-             # as.mcmc(post[[7]]),
-             # as.mcmc(post[[8]]),
-             # as.mcmc(post[[9]]),
-             # as.mcmc(post[[10]]))
+             as.mcmc(post[[5]])) 
+            #  as.mcmc(post[[6]]),
+            #  as.mcmc(post[[7]]),
+            #  as.mcmc(post[[8]]),
+            #  as.mcmc(post[[9]]),
+            #  as.mcmc(post[[10]]),
+            # as.mcmc(post[[11]]), 
+            # as.mcmc(post[[12]]), 
+            # as.mcmc(post[[13]]),
+            # as.mcmc(post[[14]]),
+            # as.mcmc(post[[15]]),
+            # as.mcmc(post[[16]]),
+            # as.mcmc(post[[17]]),
+            # as.mcmc(post[[18]]),
+            # as.mcmc(post[[19]]),
+            # as.mcmc(post[[20]]))
 
 # Identify chains with NAs that 
 # failed to initialize
@@ -296,6 +307,23 @@ lines(rep(c(1:5)[m] + c(-0.1,0.1)[tr],2), mus.HDI80[1:2,c(1,2,3,5,7)[m],tr], lwd
 legend(x=1.15,y=0.4, pch=c(16,17), pt.cex=2, cex=1.5, xpd=NA, horiz=T, 
        legend=c("Unmanaged", "Translocated" ))
 
+# Plot effort effects
+plt(object=out, 
+    params=paste0("deltas[",1:4,"]"),
+    exact=TRUE, ISB=FALSE,
+    main= "Effort effects", 
+    labels=c("Number of Adults\nEffort", "Number of Adults\nEffort squared",
+             "Number of FYs\nEffort", "Number of FYs\nEffort squared"),
+    ylim=c(-0.5, 1))
+
+plt(object=out, 
+    params=paste0("deltas[",5:8,"]"),
+    exact=TRUE, ISB=FALSE,
+    main= "Effort effects continued", 
+    labels=c("Nonbreeder detection\nEffort", "Nonbreeder detection\nEffort sq",
+             "Breeder detection\nEffort", "Breeder detection\nEffort sq"),
+    ylim=c(-5, 5))
+
 # Fecundity
 par(mfrow=c(1,1))
 plt(object=out, 
@@ -329,8 +357,8 @@ plot(c(1, 2)-0.1, f.md,
 axis(1, at=c(1,2), cex.axis=2,
      labels=c("Los Haitises\nNational Park","Punta Cana"),
      padj=1)
-axis(2, at=c(0, 0.2, 0.4, 0.6, 0.8), cex.axis=2,
-     labels=c(0, NA, 0.4, NA, 0.8))
+axis(2, at=c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7), cex.axis=2,
+     labels=c(0.1, "", 0.3, "", 0.5, "", 0.7))
 lines(c(1,1)-0.1, f.HDI95[,1], lwd=3)
 lines(c(2,2)-0.1, f.HDI95[,2], lwd=3)
 lines(c(1,1)-0.1, f.HDI80[,1], lwd=6)
@@ -343,17 +371,21 @@ lines(c(1,1) +0.1, f2.HDI95[,1], lwd=3)
 lines(c(2,2) +0.1, f2.HDI95[,2], lwd=3)
 lines(c(1,1) +0.1, f2.HDI80[,1], lwd=6)
 lines(c(2,2) +0.1, f2.HDI80[,2], lwd=6)
-legend(x=1.9,y=0.8, pch=c(16,17), pt.cex=3, cex=1.5,
+legend(x=1.9,y=0.6, pch=c(16,17), pt.cex=3, cex=1.5,
        legend=c("Untreated", "Treated" ) )
 
 # Is fecundity at LHNP greater than PC
 par(mfrow=c(1,1))
 fdiff <- f[1,]-f[2,]
-hist(fdiff, main="Fecundity difference\nbetween untreated sites")
-# pd=
-mean(fdiff>0)
+hist(fdiff, main="Fecundity difference")
+abline(v=0, lty=2)
+# print probability of direction, similar to frequentist p-value
+# so values <=0.025 and >=0.975
+# Is the difference in fecundity >0 ?
+mean(fdiff>0) 
 
-# How big are the treatment effects on fecundity at each site
+# How many times greater is fecundity 
+# at treated versus non-treated sites
 median(f.pred[1,]/f[1,])
 median(f.pred[2,]/f[2,])
 
@@ -368,14 +400,14 @@ plt(object=out,
 
 
 par(mfrow=c(1,1))
-sds <- paste0("sds[", 1:9, "]")
-plt(object=out, params=sds,
-    exact=TRUE, ISB=FALSE,
-    main="Temporal SDs (synchrony among sites)", 
-    labels=c("FY survival", "NB survival", "B survival",
-             "FY to B", "NB to B", "B to NB",
-             "NB detection", "B detection",
-             "Fecundity"))
+# sds <- paste0("sds[", 1:9, "]")
+# plt(object=out, params=sds,
+#     exact=TRUE, ISB=FALSE,
+#     main="Temporal SDs (synchrony among sites)", 
+#     labels=c("FY survival", "NB survival", "B survival",
+#              "FY to B", "NB to B", "B to NB",
+#              "NB detection", "B detection",
+#              "Fecundity"))
 sds2 <- paste0("sds2[", 1:9, "]")
 plt(object=out, params=sds2,
     exact=TRUE, ISB=FALSE,
@@ -394,13 +426,13 @@ for (i in 1:(nrow(outp$R)-1)){
   R2s[ind] <- paste0("R2[",i,", ", j, "]")
   ind <- ind+1
   }}
-par(mfrow=c(2,1))
-plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE, 
-    main="Correlations btw demographic rates\n over time (synchrony)",
-    xlab = "Rhos", guide_lines=TRUE)
-plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE, 
-    main="Correlations btw demographic rates\n over time (synchrony), continued...",
-    xlab = "Rhos", guide_lines=TRUE)
+# par(mfrow=c(2,1))
+# plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE, 
+#     main="Correlations btw demographic rates\n over time (synchrony)",
+#     xlab = "Rhos", guide_lines=TRUE)
+# plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE, 
+#     main="Correlations btw demographic rates\n over time (synchrony), continued...",
+#     xlab = "Rhos", guide_lines=TRUE)
 par(mfrow=c(2,1))
 plt(object=out, params=R2s[1:18], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites",
@@ -476,6 +508,99 @@ ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=Year)) +
   ylab("Numer of females") + 
   facet_wrap("Site", scales = "free_y")
 
+#### ---- popgrowth --------
+# plot population growth rates and
+# correlations with demographics
+lam.m <- apply(outp$lambda, c(1,2), median)
+lam.hdi <- apply(outp$lambda, c(1,2), HDInterval::hdi)
+par(mfrow=c(1,2))
+plot(2012:2023, lam.m[,1], type="b", pch=1, 
+     ylab="Population growth rate", xlab="Year")
+abline(h=1, lty=2)
+plot(2012:2023, lam.m[,2], type="b", pch=1, lty=1,
+     ylab="Population growth rate", xlab="Year")
+abline(h=1, lty=2)
+
+plot.cor <- function (lambda, x, x.lab, ind.x=1:12){
+  # calculate the correlation coefficient 
+  # over each iteration to propagate error
+  cor.post <- array(NA, dim=dim(lambda)[-1])
+  cor.est <- c(NA, NA)
+  for (s in 1:2){
+  for (i in 1:dim(lambda)[[3]]){
+    cor.post[s,i] <- cor(lambda[1:12,s,i], x[ind.x,s,i])
+  }}
+  cor.df <- data.frame(median= apply(cor.post, 1, median) |> round(2),
+             ldi=apply(cor.post, 1, HDInterval::hdi)[1,] |> round(2),
+             hdi=apply(cor.post, 1, HDInterval::hdi)[2,] |> round(2),
+             pd = apply(cor.post, 1, pd) |> round(2),
+             row.names=c("LH", "PC"))
+             
+  
+  lam.m <- apply(lambda, c(1,2), median)
+  lam.hdi <- apply(lambda, c(1,2), HDInterval::hdi)
+  x.m <- apply(x, c(1,2), median)
+  x.hdi <- apply(x, c(1,2), HDInterval::hdi)
+
+  par(mfrow=c(1,2))
+  for (s in 1:2){
+    x.lims <- c(min(x.hdi[,,s]), max(x.hdi[,,s]))
+    y.lims <- c(min(lam.hdi[,,s]), max(lam.hdi[,,s]))
+  plot(x.m[ind.x,s], lam.m[1:12,s], 
+       xlim= x.lims,
+       ylim= y.lims,
+       type="n", ylab="", xlab=x.lab, 
+       main=c("Los Haitises", "Punta Cana")[s])
+  points(x.m[ind.x,s], lam.m[1:12,s], pch=1)
+  segments(x0=x.hdi[1,ind.x,s], x1=x.hdi[2,ind.x,s], 
+            y0 = lam.m[,s], y1= lam.m[,s])
+  segments(x0=x.m[ind.x,s], x1=x.m[ind.x,s], 
+            y0 = lam.hdi[1,,s], y1= lam.hdi[2,,s])
+  text(x = x.lims[1], y = (y.lims[2]-y.lims[1])*0.9+y.lims[1], 
+       paste("r = ", cor.df$median[s], " (",cor.df$ldi[s],", ", cor.df$hdi[s], ")", sep=""), 
+       pos = 4, font = 3, cex = 1)
+  text(x = x.lims[1], y = (y.lims[2]-y.lims[1])*0.8+y.lims[1], paste("P(r>0) = ", cor.df$pd[s], sep=""), 
+       pos = 4, font = 3, cex = 1)
+  }
+}
+# Plor correlations between population grrowth rates
+# and demographics. 
+# "r" is a correlation coefficient
+# and P is the probability of direction (similar to p-values)
+plot.cor(outp$lambda, outp$mn.f, x.lab="Fecundity")
+plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival")
+plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival")
+plot.cor(outp$lambda, outp$mn.phiB, x.lab="Breeder Survival")
+plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder")
+plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder")
+# Breeder to nonbreeder didn't vary over time
+
+# Plot correlation between translocation 
+# and population growth rates.
+ind.x <- 1:12
+lam.md <- apply(outp$lambda, c(1,2), median)
+lam.hdis <- apply(outp$lambda, c(1,2), HDInterval::hdi)
+plot(constl$hacked.counts[ind.x,1], lam.md[,1],
+     xlab="Number translocated", 
+     ylab="Population growth rate",
+     type="n",
+     xlim=c(min(constl$hacked.counts[,1]), max(constl$hacked.counts[,1])),
+     ylim=c(min(lam.hdis[,,1]), max(lam.hdis[,,1])),
+     main="Los Haitises")
+points(constl$hacked.counts[ind.x,1], lam.md[,1])
+segments(x0=constl$hacked.counts[ind.x,1], x1=constl$hacked.counts[ind.x,1], 
+         y0 = lam.hdis[1,,1], y1= lam.hdis[2,,1])
+plot(constl$hacked.counts[ind.x,2], lam.md[,2],
+     xlab="Number translocated", 
+     ylab="Population growth rate",
+     type="n",
+     xlim=c(min(constl$hacked.counts[,2]), max(constl$hacked.counts[,2])),
+     ylim=c(min(lam.hdis[,,2]), max(lam.hdis[,,2])),
+     main="Los Haitises")
+points(constl$hacked.counts[ind.x,2], lam.md[,2])
+segments(x0=constl$hacked.counts[ind.x,2], x1=constl$hacked.counts[ind.x,2], 
+         y0 = lam.hdis[1,,2], y1= lam.hdis[2,,2])
+
 #### ---- paramests -------
 pars1 <- c("sds", "sds2","mus", "betas",
            "NFY", "NF", "NB", "Ntot", 
@@ -487,7 +612,7 @@ pars1 <- c("sds", "sds2","mus", "betas",
 # FY to B recruitment, NB to B recruitent, B to NB recruitment,
 # Detection NB, Detection B
 
-MCMCsummary(post2, params = c(sds, sds2), 
+MCMCsummary(post2, params = sds2, #c(sds, sds2), 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
             hpd_prob = 0.95, pg0= TRUE,
@@ -545,12 +670,17 @@ MCMCsummary(post2, params = pars1[9:16],
             digits=2, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
-# Correlations among demographic rates time (synchrony)
-MCMCsummary(post2, params = Rs,
-            exact=TRUE, ISB=FALSE,
+
+MCMCsummary(post2, params = "deltas", 
             digits=2, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
+# Correlations among demographic rates time (synchrony)
+# MCMCsummary(post2, params = Rs,
+#             exact=TRUE, ISB=FALSE,
+#             digits=2, HPD = T, 
+#             hpd_prob = 0.95, pg0= TRUE,
+#             func=median, func_name="median")
 # Correlations among demographic rates site x time
 MCMCsummary(post2, params = R2s, 
             exact=TRUE, ISB=FALSE,
@@ -559,14 +689,14 @@ MCMCsummary(post2, params = R2s,
             func=median, func_name="median")
 
 #### ---- traceplots ------
-MCMCtrace(post2, pdf=FALSE, params= "sds")
+#MCMCtrace(post2, pdf=FALSE, params= "sds")
 MCMCtrace(post2, pdf=FALSE, params= "sds2")
 MCMCtrace(post2, pdf=FALSE, params= "mus")
 MCMCtrace(post2, pdf=FALSE, params= "betas")
 MCMCtrace(post2, pdf=FALSE, params= "NF")
 MCMCtrace(post2, pdf=FALSE, params= "NFY")
 MCMCtrace(post2, pdf=FALSE, params= "NB")
-MCMCtrace(post2, pdf=FALSE, params= "R")
+MCMCtrace(post2, pdf=FALSE, params= "R2")
 
 #### ---- fit ------
 # Goodness of fit check

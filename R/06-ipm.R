@@ -4,7 +4,6 @@ library('parallel')
 library ('coda')
 #load("data/data.rdata")
 load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
-#constl$j2 <- c(1,2,3,4,5,7,8)
 
 #################################
 # The model
@@ -43,32 +42,14 @@ mycode <- nimbleCode(
     # survival, recruitment, and detection can be correlated
     for (k in 1:8){
       betas[k] ~ dunif(-20, 20)  # prior for coefficients
+      deltas[k] ~ dunif(-20, 20)
     } # k
-    # for (j in 1:7){
-    #   for (s in 1:nsite){
-    #     lmus[j2[j],s] <- logit(mus[j2[j],s])
-    #     mus[j2[j],s] ~ dbeta(1,1) # prior for means
-    #   }}     # m population #s sex #h hacked
-    # mus[6,1] ~ dbeta(1,20) # informative prior for transition NB to B
-    # mus[6,2] ~ dbeta(1,1)
     
     for (j in 1:8){
       for (s in 1:nsite){
         lmus[j,s] <- logit(mus[j,s])
         mus[j,s] ~ dbeta(1,1) # prior for means
       }}     # m population #s sex #h hacked
-    
-    # Temporal random effects and correlations among all sites
-    for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
-    # estimated using the multivariate normal distribution
-    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # multivariate normal for temporal variance
-    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
-      eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-                          cholesky = U[1:p, 1:p], prec_param = 0)
-    }
     
     # Temporal random effects and correlations between sites
     for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation
@@ -108,7 +89,7 @@ mycode <- nimbleCode(
       ppp[k] <- rr/(rr+mu.f[k])
       log(mu.f[k]) <- lmu.f[site.nest[k]] +  
         gamma*treat.nest[k] + 
-        eps[9, year.nest[k] ] + 
+        #eps[9, year.nest[k] ] + 
         eta[9, site.nest[k], year.nest[k] ] 
     } # k
     # derive yearly brood size for population model
@@ -141,7 +122,7 @@ mycode <- nimbleCode(
       for (s in 1:nsite){
         # subtract one because to allow dcat to include zero
         N[v, 1, s] <- N2[v, 1, s] - 1 
-        N2[v, 1, s] ~ dcat(pPrior[1:s.end[s], s]) 
+        N2[v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s]) # Priors differ for FYs and adults
       }} # s t
     # Abundance for years > 1
     for (t in 1:(nyr-1)){
@@ -176,8 +157,10 @@ mycode <- nimbleCode(
         NB[t, s] <- sum(N[5:7, t, s]) # number of adult breeder females
         NAD[t, s] <- NF[t, s] + NB[t, s] # number of adults
         Ntot[t, s] <- sum(N[1:7, t, s]) # total number of females
-        log(lamAD[t, s]) <- log(NAD[t, s]) + log(effort[t, s])
-        log(lamFY[t, s]) <- log(N[1, t, 1]) + log(effort[t, s])
+        #log(lamAD[t, s]) <- log(NAD[t, s]) + log(effort[t, s])
+        #log(lamFY[t, s]) <- log(N[1, t, s]) + log(effort[t, s])
+        log(lamAD[t, s]) <- log(NAD[t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2
+        log(lamFY[t, s]) <- log(N[1, t, s]) + deltas[3]*effort2[t, s] + deltas[4]*effort2[t, s]^2
         }# s
       # First-years at different sites have different distributions
       # for better model fit
@@ -271,24 +254,26 @@ mycode <- nimbleCode(
     for (i in 1:nind){
       for (t in 1:nyr){
         #Survival
-        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + eps[1,t] + 
+        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + #eps[1,t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eta[2, site[i,t],t] + eps[2,t] + 
+        logit(phiA[i,t]) <- eta[2, site[i,t],t] + #eps[2,t] + 
           lmus[2, site[i,t]] +  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eta[3, site[i,t],t] + eps[3,t] + 
+        logit(phiB[i,t]) <- eta[3, site[i,t],t] + #eps[3,t] + 
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + eps[4,t] + 
+        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + #eps[4,t] + 
           lmus[4, site[i,t]] + betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + eps[5,t] + 
+        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + #eps[5,t] + 
           lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
         logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
           lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eta[7, site[i,t],t] + eps[7,t] + 
-          lmus[7, site[i,t]] + betas[7]*hacked[i] # resight of nonbreeders
-        logit(pB[i,t]) <- eta[8, site[i,t],t] + eps[8,t] + 
-          lmus[8, site[i,t]] + betas[8]*hacked[i] # resight of breeders
+        logit(pA[i,t]) <- eta[7, site[i,t],t] + #eps[7,t] + 
+          lmus[7, site[i,t]] + betas[7]*hacked[i] +
+          deltas[5]*effort2[t, site[i,t]] + deltas[6]*effort2[t, site[i,t]]^2# resight of nonbreeders
+        logit(pB[i,t]) <- eta[8, site[i,t],t] + #eps[8,t] + 
+          lmus[8, site[i,t]] + betas[8]*hacked[i] + 
+          deltas[7]*effort2[t, site[i,t]] + deltas[8]*effort2[t, site[i,t]]^2# resight of breeders
       }#t
     }#i
     
@@ -373,13 +358,13 @@ run_ipm <- function(info, datl, constl, code){
     # fecundity
     "lmu.f", "gamma", "rr", "mn.f", 
     # survival 
-    "mus", "lmus", "betas",
+    "mus", "lmus", "betas", "deltas",
     # abundance
     "NB", "NF", "NFY", "N", "NAD",
     "r",
     "N", "Ntot",
     # error terms
-    "eps", "sds", "Ustar", "U", "R",
+    #"eps", "sds", "Ustar", "U", "R",
     "eta", "sds2", "Ustar2", "U2", "R2",
     # yearly summaries
     'mn.phiFY', 'mn.phiA', 'mn.phiB',
@@ -425,7 +410,6 @@ run_ipm <- function(info, datl, constl, code){
   return(post)
 } # run_ipm function end
 
-
 this_cluster <- makeCluster(5)
 post <- parLapply(cl = this_cluster, 
                   X = par_info[1:5], 
@@ -436,7 +420,4 @@ post <- parLapply(cl = this_cluster,
 stopCluster(this_cluster)
 
 save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm.rdata")
-
-# save(post, mycode,
-#      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_statespace.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
