@@ -780,7 +780,7 @@ inits.func1 <- function (){
 
 
 # set seed for reproducibility
-# then draw random seeds (but reproducible) for each chain
+# then draw random seeds but recoverable seeds for each chain
 set.seed(1)
 seeds <- sample(1:1000000, size=20, replace=FALSE)
 par_info <- # allows for different seed for each chain
@@ -825,7 +825,7 @@ Ni.func <- function (){
     for (sc in 1:6){
       Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
       for (t in nyr:(nyr+100)){
-        Ni.pva[sc, 1:7, t, 1:2] <- Ni[1:7, 13, 1:2]
+        Ni.pva[sc, 1:7, t, 1:2] <- 0 #Ni[1:7, 13, 1:2]
 }} # t sc
     return(Ni.pva)
 } # function
@@ -853,7 +853,7 @@ inits.func.pva <- function (){
 
 
 # set seed for reproducibility
-# then draw random seeds (but reproducible) for each chain
+# then draw random but recoverable seeds for each chain
 set.seed(1)
 seeds <- sample(1:1000000, size=10, replace=FALSE)
 par_info_pva <- # allows for different seed for each chain
@@ -870,7 +870,7 @@ par_info_pva <- # allows for different seed for each chain
     list(seed=seeds[10], inits = inits.func.pva())
   )
 
-save(datl, constl, 
+save(datl, constl, outp,
      par_info, par_info_pva,
      inits.func1, inits.func1, inits.func.pva, 
      z, seeds,

@@ -1,5 +1,5 @@
 #### ---- setup -------
-#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva.rdata")
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
@@ -148,7 +148,7 @@ par(mfrow=c(4,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("N[", 1, ", ", 1:13, ", 1]"), 
-    main="Los Haitises\nFirst-years born", 
+    main="Los Haitises\nFirst-years fledged", 
     labels = 2011:2023, 
     xlab = "Year", ylab= "Abundance")
 plt(object=out, 
@@ -193,7 +193,7 @@ par(mfrow=c(4,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("N[", 1, ", ", 1:13, ", 2]"), 
-    main="Punta Cana\nFY born",
+    main="Punta Cana\nFY fledged",
     labels = 2011:2023, 
     xlab = "Year", ylab= "Abundance")
 plt(object=out, 
@@ -305,7 +305,7 @@ lines(rep(c(1:5)[m] + c(-0.1,0.1)[tr],2), mus.HDI95[1:2,c(1,2,3,5,7)[m],tr], lwd
 lines(rep(c(1:5)[m] + c(-0.1,0.1)[tr],2), mus.HDI80[1:2,c(1,2,3,5,7)[m],tr], lwd=6)
 }}
 legend(x=1.15,y=0.4, pch=c(16,17), pt.cex=2, cex=1.5, xpd=NA, horiz=T, 
-       legend=c("Unmanaged", "Translocated" ))
+       legend=c("Not Translocated", "Translocated" ))
 
 # Plot effort effects
 plt(object=out, 
@@ -395,9 +395,6 @@ par(mfrow=c(1,1))
 plt(object=out, 
     params=c("gamma"), 
     main="Anti-Parasitic Fly\nTreatment Effects", ylim=c(0,3))
-
-
-
 
 par(mfrow=c(1,1))
 # sds <- paste0("sds[", 1:9, "]")
@@ -495,15 +492,16 @@ lF$Stage <- "Nonbreeder"
 ldat <- rbind(lFY, lB, lF)
 colnames(ldat)[1:3] <- c("Year", "Sitenum", "Number") 
 ldat$Site <- ifelse(ldat$Sitenum==1, "Los Haitises", "Punta Cana")
+ldat$year <- ldat$Year+2010
 
 # Use median number of females in each stage
 # to plot an approximate population structure
-ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=Year)) + 
+ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=year)) + 
   geom_bar(position="fill", stat="identity") +
   ylab("Proportion of population") + 
   facet_wrap("Site")
 
-ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=Year)) + 
+ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=year)) + 
   geom_bar(position="stack", stat="identity") +
   ylab("Numer of females") + 
   facet_wrap("Site", scales = "free_y")
@@ -511,16 +509,31 @@ ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=Year)) +
 #### ---- popgrowth --------
 # plot population growth rates and
 # correlations with demographics
+# 2012 represents the 
+# pop growth between breeding seasons of 2011-2012 etc.
+# A population growth rate >1 means the population is growing
+# while a pgr <1 means it's shrinking.
 lam.m <- apply(outp$lambda, c(1,2), median)
 lam.hdi <- apply(outp$lambda, c(1,2), HDInterval::hdi)
 par(mfrow=c(1,2))
 plot(2012:2023, lam.m[,1], type="b", pch=1, 
-     ylab="Population growth rate", xlab="Year")
+     ylab="Population growth rate", xlab="Year", 
+     ylim=c(min(lam.hdi[,,1]), max(lam.hdi[,,1])),
+     main="Los Haitises")
 abline(h=1, lty=2)
-plot(2012:2023, lam.m[,2], type="b", pch=1, lty=1,
-     ylab="Population growth rate", xlab="Year")
-abline(h=1, lty=2)
+segments(x0=2012:2023, x1=2012:2023, 
+         y0 = lam.hdi[1,,1], y1= lam.hdi[2,,1])
 
+plot(2012:2023, lam.m[,2], type="b", pch=1, lty=1,
+     ylab="Population growth rate", xlab="Year",
+     ylim=c(min(lam.hdi[,,2]), max(lam.hdi[,,2])),
+     main="Punta Cana")
+abline(h=1, lty=2)
+segments(x0=2012:2023, x1=2012:2023, 
+         y0 = lam.hdi[1,,2], y1= lam.hdi[2,,2])
+
+# create a function to plot correlations
+# between demographics and population growth rates
 plot.cor <- function (lambda, x, x.lab, ind.x=1:12){
   # calculate the correlation coefficient 
   # over each iteration to propagate error
@@ -549,7 +562,7 @@ plot.cor <- function (lambda, x, x.lab, ind.x=1:12){
   plot(x.m[ind.x,s], lam.m[1:12,s], 
        xlim= x.lims,
        ylim= y.lims,
-       type="n", ylab="", xlab=x.lab, 
+       type="n", ylab="Population growth rate", xlab=x.lab, 
        main=c("Los Haitises", "Punta Cana")[s])
   points(x.m[ind.x,s], lam.m[1:12,s], pch=1)
   segments(x0=x.hdi[1,ind.x,s], x1=x.hdi[2,ind.x,s], 
@@ -565,15 +578,22 @@ plot.cor <- function (lambda, x, x.lab, ind.x=1:12){
 }
 # Plor correlations between population grrowth rates
 # and demographics. 
-# "r" is a correlation coefficient
-# and P is the probability of direction (similar to p-values)
-plot.cor(outp$lambda, outp$mn.f, x.lab="Fecundity")
+# "r" is a correlation coefficient and represents
+# the magnitude of the correlation
+# P(r>0) is the probability of direction (similar to p-values)
+# that is, the probability that an effect exists
+plot.cor(outp$lambda, outp$mn.f, x.lab="Fecundity", ind.x=2:13)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival")
 plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival")
 plot.cor(outp$lambda, outp$mn.phiB, x.lab="Breeder Survival")
 plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder")
 plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder")
 # Breeder to nonbreeder didn't vary over time
+# Does the number of breeders correlate with pop growth?
+plot.cor(outp$lambda, outp$NB, x.lab="Breeder Abundance", ind.x=2:13)
+plot.cor(outp$lambda, outp$NF, x.lab="Nonbreeder Abundance", ind.x=2:13)
+plot.cor(outp$lambda, outp$NFY, x.lab="First-year Abundance", ind.x=2:13)
+plot.cor(outp$lambda, outp$Ntot, x.lab="All Stages Abundance", ind.x=2:13)
 
 # Plot correlation between translocation 
 # and population growth rates.
@@ -596,10 +616,11 @@ plot(constl$hacked.counts[ind.x,2], lam.md[,2],
      type="n",
      xlim=c(min(constl$hacked.counts[,2]), max(constl$hacked.counts[,2])),
      ylim=c(min(lam.hdis[,,2]), max(lam.hdis[,,2])),
-     main="Los Haitises")
+     main="Punta Cana")
 points(constl$hacked.counts[ind.x,2], lam.md[,2])
 segments(x0=constl$hacked.counts[ind.x,2], x1=constl$hacked.counts[ind.x,2], 
-         y0 = lam.hdis[1,,2], y1= lam.hdis[2,,2])
+         y0 = lam.hdis[1,,2], y1= lam.hdis[2,,2])  
+
 
 #### ---- paramests -------
 pars1 <- c("sds", "sds2","mus", "betas",

@@ -73,8 +73,9 @@ Other parameter estimates.
 ```
 
 # Correlations between population growth rates and demographics
-```{r,popgrowth, eval=TRUE, warning=FALSE, message=FALSE}
-```
+```{r,popgrowth, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 5)}
+```  
+
 # Print parameter estimates
 Parameter estimates for input into a population viability analysis.
 
@@ -89,9 +90,9 @@ Goodness-of-fit tests provide evidence that statistical distributions adequately
 ```{r,fit, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-## Examine Traceplots
-Traceplots provide evidence that models adequately converged.
+## Examine Traceplots, omitted to reduce file size
+<!-- Traceplots provide evidence that models adequately converged. -->
 
-```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE}
-```
+<!-- ```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE} -->
+<!-- ``` -->
 
