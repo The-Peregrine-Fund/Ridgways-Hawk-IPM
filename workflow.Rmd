@@ -91,8 +91,8 @@ Goodness-of-fit tests provide evidence that statistical distributions adequately
 ```
 
 ## Examine Traceplots, omitted to reduce file size
-<!-- Traceplots provide evidence that models adequately converged. -->
+Traceplots provide evidence that models adequately converged.
 
-<!-- ```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE} -->
-<!-- ``` -->
+```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE}
+```
 

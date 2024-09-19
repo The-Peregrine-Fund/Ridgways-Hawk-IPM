@@ -41,7 +41,7 @@ mycode <- nimbleCode(
     ###################################################
     # survival, recruitment, and detection can be correlated
     for (k in 1:8){ 
-      betas[k] ~ dunif(-10, 10)  # prior for coefficients
+      betas[k] ~ dunif(-20, 20)  # prior for coefficients
     } # k
     for (j in 1:8){ 
       for (s in 1:nsite){
@@ -90,7 +90,7 @@ mycode <- nimbleCode(
     for (s in 1:nsite){
       lmu.f[s] ~ dnorm(0, sd=5)
     } # s
-    gamma ~ dunif(-10, 10)
+    gamma ~ dunif(-20, 20)
     rr ~ dexp(0.05)
     
     # Fecundity       

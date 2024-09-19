@@ -76,8 +76,7 @@ df$lcode[df$lcode %in% nrs] <- "NR"
 #df$l.code[df$l.code=="None"] <- "NB"
 df$ID <- paste(df$lcode, df$rcode, 
                df$lcol, df$rcol, sep="-")
- 
-  
+
 #**********************
 #* 2. Counts 
 #**********************
@@ -151,17 +150,8 @@ df.marked.max <- df.marked.max[df.marked.max$sex=="Female", ]
 # dimnames(counts.unmarked)[[1]] <- c('nonbreeder', 'breeder')
 
 # subset to females
+df.all <- df
 df <- df[df$sex=="Female",]
-#**********************
-#* 3. Territory occupancy 
-#**********************
-# maybe needs work
-# data missing zeroes for surveyed but unoccupied sites
-# not used in IPM but possibly useful for 
-# later analyses
-occ <- tapply(df$territory.name, list(df$territory.name, df$year.resighted), 
-       function(x) {ifelse(length(x)>0,1,NA)}, default=NA)
-occ <- occ[order( as.numeric(rownames(occ)) ), ]
 
 #**********************
 #* 2. Clean up dataset ----
@@ -371,14 +361,14 @@ z2 <-  z
 #**********************
 # Productivity from mark resight data
 # Stage=1 is a nestling
-df$prod <- ifelse(df$Stage==1, 1, 
-                  ifelse(df$Stage==3, 0, NA))
-prod <- tapply(df$prod, list(df$territory.name, df$year.resighted), sum, na.rm=TRUE)
+df.all$prod <- ifelse(df.all$Stage==1, 1, 
+                  ifelse(df.all$Stage==3, 0, NA))
+prod <- tapply(df.all$prod, list(df.all$territory.name, df.all$year.resighted), sum, na.rm=TRUE)
 table(prod)
 
-df$group <- ifelse(df$group=="NR", NA, as.numeric(df$group) )
-levels(factor(df$group))
-treat <- tapply(df$group, list(df$territory.name, df$year.resighted), max, na.rm=TRUE)
+df.all$group <- ifelse(df.all$group=="NR", NA, as.numeric(df.all$group) )
+levels(factor(df.all$group))
+treat <- tapply(df.all$group, list(df.all$territory.name, df.all$year.resighted), max, na.rm=TRUE)
 treat <- ifelse(treat==3, 1, ifelse(treat==1,0,NA))
 
 # make long form to speed up bc many NAs
@@ -601,9 +591,7 @@ s.end[3,2] <- s.end[4,2] <-
 #* 11. Data for analysis in NIMBLE----
 #**********************
 datl <- list( # productivity data
-              f = lp$fledged,
-              # brood = as.numeric(lb$brood),
-              # nest.success = lp$nestsuccess,
+              prod = lp$fledged,
               # survival data
               y = y,
               #z = z, 
@@ -630,16 +618,7 @@ constl <- list( # survival
                 yrind.nest = yrind.nest,
                 nest.end = nest.end,
                 site.nest = lp$site2,
-                
-                # treat.brood = lb$treat,
-                # nbrood = nrow(lb),
-                # year.brood = lb$year2, 
-                # yrind.brood = yrind.brood,
-                # brood.end = brood.end,
-                # mintrunc = min(lb$brood),
-                # maxtrunc = max(lb$brood),
-                # site.brood = ,
-                
+            
                 pPrior = pPrior,
                 p = p, # number of random yr effects
                 p2 = p2, # number of random yr effects
@@ -701,48 +680,24 @@ t(rUstar)%*%rUstar
 library ('MCMCvis')
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_simp.rdata")
 repro <- MCMCsummary(post, params = c("lmu.f", "gamma", "rr"))
-
 mus <- MCMCsummary(post, params = "mus")
 sds <- MCMCsummary(post, params = "sds")
 sds2 <- MCMCsummary(post, params = "sds2")
 betas <- MCMCsummary(post, params = "betas")
 u <- MCMCpstr(post, "Ustar", type="chains")
 Ustar <- apply(u$Ustar, c(1,2), mean)
-#Ustar <- rbind(Ustar, rUstar[9,1:8]) # tack on one row
-#Ustar <- cbind(Ustar, rUstar[1:9,9]) # tack on column including random values
 Ustar <- abs(Ustar)
 diag(Ustar) <- 1
 u2 <- MCMCpstr(post, "Ustar2", type="chains")
 Ustar2 <- apply(u2$Ustar2, c(1,2), mean)
-#Ustar2 <- rbind(Ustar2, rUstar[9,1:8]) # tack on one row
-#Ustar2 <- cbind(Ustar2, rUstar[1:9,9]) # tack on column including random values
 Ustar2 <- abs(Ustar2)
 diag(Ustar2) <- 1
 
 # Get N inits from prelim runs that worked
 # I ran a model with 20 chains 200 posterior iters
 # and got 5 chains that worked.
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_Nprior.rdata")
-out <- list(as.mcmc(post[[1]]), 
-            as.mcmc(post[[2]]), 
-            as.mcmc(post[[3]]),
-            as.mcmc(post[[4]]),
-            as.mcmc(post[[5]]),
-            as.mcmc(post[[6]]),
-            as.mcmc(post[[7]]),
-            as.mcmc(post[[8]]),
-            as.mcmc(post[[9]]),
-            as.mcmc(post[[10]]),
-            as.mcmc(post[[11]]), 
-            as.mcmc(post[[12]]), 
-            as.mcmc(post[[13]]),
-            as.mcmc(post[[14]]),
-            as.mcmc(post[[15]]),
-            as.mcmc(post[[16]]),
-            as.mcmc(post[[17]]),
-            as.mcmc(post[[18]]),
-            as.mcmc(post[[19]]),
-            as.mcmc(post[[20]]))
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_shortrun_sync.rdata")
+out <- lapply(post, as.mcmc)
 
 # Identify chains with NAs that 
 # failed to initialize
@@ -758,7 +713,7 @@ outp <- MCMCpstr(out, type="chains")
 inits.func1 <- function (){
   list(  
   # fecundity inits from submodel run
-  lmu.f = c(repro$mean[1], repro$mean[2]),
+  lmu.prod = c(repro$mean[1], repro$mean[2]),
   gamma = repro$mean[3], 
   rr = repro$mean[4],
   # survival
@@ -766,15 +721,15 @@ inits.func1 <- function (){
   mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
   deltas = runif(8, -0.1, 0.1),
-  # sds = sds$mean,
-  # Ustar = Ustar,
+  sds = sds$mean,
+  Ustar = Ustar,
   sds2 = sds2$mean,
   Ustar2 = Ustar2,
   # counts
   countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
   r = mean(outp$r),
   N = outp$N[1:7,1:13,1:2, 
-             sample(c(1, 2001, 4001, 6001, 8001), 1, replace = F)] # sample from inits of chains that worked
+              sample(seq(1, 5200, by=400), 1, replace = F)] # sample from inits of chains that worked
               
   )}
 
@@ -820,7 +775,7 @@ post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
 Ni.func <- function (){
     Ni <- outp$N[1:7,1:13,1:2,
-                 sample(c(1, 2001, 4001, 6001, 8001), 1, replace = F)]
+                 sample(seq(1, 5200, by=400), 1, replace = F)]
     Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
     for (sc in 1:6){
       Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
@@ -833,7 +788,7 @@ Ni.func <- function (){
 inits.func.pva <- function (){
   list(  
     # fecundity inits from submodel run
-    lmu.f = c(repro$mean[1], repro$mean[2]),
+    lmu.prod = c(repro$mean[1], repro$mean[2]),
     gamma = repro$mean[3], 
     rr = repro$mean[4],
     # survival
@@ -841,8 +796,8 @@ inits.func.pva <- function (){
     mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
     betas = betas$mean,
     deltas = runif(8, -1, 1),
-    #sds = sds$mean,
-    #Ustar = Ustar,
+    sds = sds$mean,
+    Ustar = Ustar,
     sds2 = sds2$mean,
     Ustar2 = Ustar2,
     # counts
@@ -873,7 +828,8 @@ par_info_pva <- # allows for different seed for each chain
 save(datl, constl, outp,
      par_info, par_info_pva,
      inits.func1, inits.func1, inits.func.pva, 
-     z, seeds,
+     z, seeds, 
+     repro, mus, sds, sds2, Ustar, Ustar2, betas, # return estimates from Iipm_simp for initial values
      file="data\\data.rdata")
 
 #*********************

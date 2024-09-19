@@ -1,21 +1,12 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
 library ('ggplot2')
 library('reshape2')
-out <- list(as.mcmc(post[[1]]), 
-             as.mcmc(post[[2]]), 
-             as.mcmc(post[[3]]),
-             as.mcmc(post[[4]]),
-             as.mcmc(post[[5]]),
-             as.mcmc(post[[6]]),
-             as.mcmc(post[[7]]),
-             as.mcmc(post[[8]]),
-             as.mcmc(post[[9]]),
-             as.mcmc(post[[10]]))
+lapply(post, as.mcmc)
 
 # Identify chains with NAs that 
 # failed to initialize
@@ -23,12 +14,11 @@ NAlist <- c()
 for (i in 1:length(out)){
   NAlist[i] <- any (is.na(out[[i]][,1:9493]) | out[[i]][,1:9493]<0)
 }
+!NAlist
 # Subset chains to those with good initial values
 out <- out[!NAlist]
 post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
-
-!NAlist
 
 #### ---- pltfunction -------
 # default settings for plots 
@@ -42,39 +32,6 @@ plt  <- function(object, params,...) {
   }
 
 #### ---- catplots1 -------
-# Abundance of females at Los Haitises
-library (viridis)
-cols <- viridis(6)
-pe <- apply(outp$extinct, c(1,2,3), mean)
-par(mfrow=c(1,1))
-plot(2024:2123, pe[1, ,1], 
-     type="l", col=cols[1], lwd=2,
-     ylim=c(0,1), main="Los Haitises",
-     ylab="Quasi-extinction probability", xlab="Year")
-lines(2024:2123, pe[2, ,1], col=cols[2], lwd=2)
-lines(2024:2123, pe[3, ,1], col=cols[3], lwd=2)
-lines(2024:2123, pe[4, ,1], col=cols[4], lwd=2, lty=2)
-lines(2024:2123, pe[5, ,1], col=cols[5], lwd=2, lty=2)
-lines(2024:2123, pe[6, ,1], col=cols[6], lwd=2, lty=2)
-legend(x=2024, y=1, title="Scenarios",
-        legend=c("hacked=0, nests=all", "hacked=0, nests=0", "hacked=0, nests=10",
-                "hacked=10, nests=all", "hacked=10, nests=0", "hacked=10, nests=10"),
-        xpd=NA, col=cols, lty=c(1,1,1,2,2,2), lwd=2)
-
-par(mfrow=c(1,1))
-plot(2024:2123, pe[1, ,2], 
-     type="l", col=cols[1], lwd=2,
-     ylim=c(0,1), main="Punta Cana",
-     ylab="Quasi-extinction probability", xlab="Year")
-lines(2024:2123, pe[2, ,2], col=cols[2], lwd=2)
-lines(2024:2123, pe[3, ,2], col=cols[3], lwd=2)
-lines(2024:2123, pe[4, ,2], col=cols[4], lwd=2, lty=2)
-lines(2024:2123, pe[5, ,2], col=cols[5], lwd=2, lty=3)
-lines(2024:2123, pe[6, ,2], col=cols[6], lwd=2, lty=4)
-legend(x=2024, y=1, title="Scenarios",
-       legend=c("hacked=0, nests=all", "hacked=0, nests=0", "hacked=0, nests=10",
-                "hacked=10, nests=all", "hacked=10, nests=0", "hacked=10, nests=10"),
-       xpd=NA, col=cols, lty=c(1,1,1,2,2,2), lwd=2)
 
 plot(2024:2123, pe[3, ,1], type="l", 
      ylim=c(0,1),
