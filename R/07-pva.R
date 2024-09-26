@@ -3,23 +3,24 @@ library('nimble')
 library('parallel')
 library ('coda')
 load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
 #load("data/data.rdata")
 constl$K <- 100
-
+cpus <- 10
 #######################
 # Add data for PVA projections and scenarios
 #######################
-hacked.counts <- array(0, dim=c(6, 113, 3))
+hacked.counts <- array(0, dim=c(6, constl$nyr+constl$K, 3))
 for (sc in 1:6){
-  hacked.counts[sc,1:13,1:3] <- constl$hacked.counts 
-  hacked.counts[sc,14:113,1:3] <- c(0, 0, 0, 1, 1, 1)[sc]*cbind(rep(-10, 100), rep(10, 100), rep(0, 100) )
+  hacked.counts[sc,1:constl$nyr,1:3] <- constl$hacked.counts 
+  hacked.counts[sc,14:(constl$nyr+constl$K),1:3] <- 
+    c(0, 0, 0, 1, 1, 1)[sc]*cbind(rep(-10, constl$K), rep(10, constl$K), rep(0, constl$K) )
 }
-
 constl$hacked.counts <- hacked.counts
 datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) )
 constl$treat.nest2 <- c(1, 0, 1, 1, 0, 1) # treated or not
 constl$hacked2 <- c(0, 0, 0, 1, 1, 1) # scenario- hacked or not
-constl$effort2 <- rbind(constl$effort2, array(0, dim=c(100,2), dimnames=list(2024:2123, c("LH", "PC"))))
+constl$effort2 <- rbind(constl$effort2, array(0, dim=c(constl$K,2), dimnames=list(2024:(2024+constl$K-1), c("LH", "PC"))))
 
 #######################
 # Priors taken from IPM
@@ -31,67 +32,68 @@ load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
 # Get inits from IPM output
 # Identify chains with NAs that 
 # failed to initialize
+out <- lapply(post, as.mcmc)
+# Identify chains with NAs that failed to initialize
+NAlist <- c()
+for (i in 1:length(out)){
+  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+}
+out <- out[!NAlist]
+outp <- MCMCpstr(out, type="chains")
+!NAlist
+
+mn.lam <- apply(outp$lambda, c(2,3), mean)
+lam <- apply(mn.lam, 1, mean)
+
 Ni.func <- function (){
-  Ni <- outp$N[1:7,1:13,1:2,
-               sample(seq(1, 20000, by=1000), 1, replace = F)]
-  Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
+  Ni <- outp$N[1:7,1:constl$nyr,1:2,
+               sample(seq(1, 5200, by=400), 1, replace = F)]
+  Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,constl$K,0)))
   for (sc in 1:6){
-    Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni
-    for (t in constl$nyr:(constl$nyr+100)){
-      Ni.pva[sc, 1:7, t, 1:2] <- Ni[1:7, 13, 1:2]
-    }} # t sc
+    Ni.pva[sc, 1:7, 1:constl$nyr, 1:2] <- Ni
+    for (t in constl$nyr:(constl$nyr+constl$K)){
+      for (s in 1:2){
+      Ni.pva[sc, 1:7, t, s] <- Ni[1:7, 13, s] #round(Ni[1:7, 13, s]*lam[s]^(t-13))
+    }}} # t sc
   return(Ni.pva)
 } # function
+
+u1 <- apply(outp$Ustar, c(1,2), mean)
+#u1 <- abs(u1)
+#diag(u1) <- 1
+u2 <- apply(outp$Ustar2, c(1,2), mean)
+#u2 <- abs(u2)
+#diag(u2) <- 1
 
 inits.func.pva <- function (){
   list(  
     # fecundity inits from submodel run
-    lmu.prod = c(repro$mean[1], repro$mean[2]),
-    gamma = repro$mean[3], 
-    rr = repro$mean[4],
+    lmu.prod = apply(outp$lmu.prod, 1, mean),
+    gamma = mean(outp$gamma), 
+    rr = mean(outp$rr),
     # survival
     z = par_info[[1]]$inits$z, 
-    mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
-    betas = betas$mean,
+    mus = apply(outp$mus, c(1,2), mean), # values from non-integrated run
+    betas = apply(outp$betas, 1, mean),
     deltas = apply(outp$deltas, 1, mean),
-    sds = sds$mean ,
-    Ustar = Ustar,
-    sds2 =  sds2$mean ,
-    Ustar2 = Ustar2,
+    sds = apply(outp$sds, 1, mean),
+    Ustar = u1,
+    sds2 =  apply(outp$sds2, 1, mean),
+    Ustar2 = u1,
     # counts
-    countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
-    r = mean(outp$r)#,
-    #N = Ni.func()
+    countsAdults= matrix(c(374, 335, 305, 295, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
+    r = mean(outp$r),
+    N = Ni.func()
   )}
-
 
 # set seed for reproducibility
 # then draw random but recoverable seeds for each chain
 set.seed(1)
-seeds <- sample(1:1000000, size=20, replace=FALSE)
-par_info_pva <- # allows for different seed for each chain
-  list(
-    list(seed=seeds[1], inits = inits.func.pva()),
-    list(seed=seeds[2], inits = inits.func.pva()),
-    list(seed=seeds[3], inits = inits.func.pva()),
-    list(seed=seeds[4], inits = inits.func.pva()),
-    list(seed=seeds[5], inits = inits.func.pva()),
-    list(seed=seeds[6], inits = inits.func.pva()),
-    list(seed=seeds[7], inits = inits.func.pva()),
-    list(seed=seeds[8], inits = inits.func.pva()),
-    list(seed=seeds[9], inits = inits.func.pva()),
-    list(seed=seeds[10], inits = inits.func.pva()),
-    list(seed=seeds[11], inits = inits.func.pva()),
-    list(seed=seeds[12], inits = inits.func.pva()),
-    list(seed=seeds[13], inits = inits.func.pva()),
-    list(seed=seeds[14], inits = inits.func.pva()),
-    list(seed=seeds[15], inits = inits.func.pva()),
-    list(seed=seeds[16], inits = inits.func.pva()),
-    list(seed=seeds[17], inits = inits.func.pva()),
-    list(seed=seeds[18], inits = inits.func.pva()),
-    list(seed=seeds[19], inits = inits.func.pva()),
-    list(seed=seeds[20], inits = inits.func.pva())
-  )
+seeds <- sample(1:1000000, size=cpus, replace=FALSE)
+par_info_pva <- list()# allows for different seed for each chain
+for (i in 1:cpus){
+  par_info_pva[[i]] <- list(seed=seeds[i], inits = inits.func.pva())
+}
 
 #################################
 # The model
@@ -145,7 +147,7 @@ mycode <- nimbleCode(
     Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
     U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
     # multivariate normal for temporal variance
-    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
+    for (t in 1:(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
       eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
                           cholesky = U[1:p, 1:p], prec_param = 0)
     }
@@ -215,8 +217,9 @@ mycode <- nimbleCode(
         for (t in (nyr+1):(nyr+K) ){
           for (s in 1:nsite){
         # calc percent of nests treated so it cannot exceed 100% 
-        perc.treat[sc, t, s] <- step( NB[sc, t, s]-10 ) * (10+0.001)/(NB[sc, t, s]+0.001) + # NB>=10, calculate proportion
-                                step( NB[sc, t, s]-1 ) * 1-step( NB[sc, t, s]-10 )  # NB>1 and NB<10 100%
+        perc.treat[sc, t, s] <- ( equals(s, 1) + equals(s, 4) ) + # If scenario =1 or 4, prop =1.0
+                                step( NB[sc, t, s]-10 ) * (10+0.001)/(NB[sc, t, s]+0.001) * ( (1-equals(s, 1)) + (1-equals(s, 4)) ) + # NB>=10, calculate proportion
+                                step( NB[sc, t, s]-1 ) * 1-step( NB[sc, t, s]-10 ) * ( (1-equals(s, 1)) + (1-equals(s, 4)) )  # NB>1 and NB<10 100%
                                 # evaluates to zero when NB<1
         log(mn.prod[sc, t, s]) <- lmu.prod[s] +  
                               gamma*treat.nest2[sc]*perc.treat[sc, t, s] + 
@@ -233,8 +236,7 @@ mycode <- nimbleCode(
         # subtract one because to allow dcat to include zero
         N[1, v, 1, s] <- N2[1, v, 1, s] - 1 
         N2[1, v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s])
-        # Assign estimates for years with data to 
-        # all scenarios
+        # Assign estimates for years with data to all scenarios
         for (sc2 in 2:6){
           N[sc2, v, 1, s] <- N[1, v, 1, s]
         }
@@ -247,7 +249,7 @@ mycode <- nimbleCode(
         N[1, 1, t+1, s] ~ dpois( (NFY[1, t, s]*mn.phiFY[1, t, s]*mn.psiFYB[1, t, s] + # first year breeders
                                  NF[1, t, s]*mn.phiA[1, t, s]*mn.psiAB[1, t, s] + # nonbreeders to breeders
                                  NB[1, t, s]*mn.phiB[1, t, s]*(1-mn.psiBA[1, t, s])) # breeders remaining
-                              *mn.prod[1, t+1, s]/2 ) # end Poisson
+                              *(mn.prod[1, t+1, s]/2) ) # end Poisson
         # Abundance of nonbreeders
         ## Second year nonbreeders
         N[1, 2, t+1, s] ~ dbin(mn.phiFY[1, t, s]*(1-mn.psiFYB[1, t, s]), NFY[1, t, s]) # Nestlings to second year nonbreeders
@@ -278,7 +280,7 @@ mycode <- nimbleCode(
           N[sc, 1, t+1, s] ~ dpois( (NFY[sc, t, s]*mn.phiFY[sc, t, s]*mn.psiFYB[sc, t, s] + # first year breeders
                                        NF[sc, t, s]*mn.phiA[sc, t, s]*mn.psiAB[sc, t, s] + # nonbreeders to breeders
                                        NB[sc, t, s]*mn.phiB[sc, t, s]*(1-mn.psiBA[sc, t, s])) # breeders remaining
-                                    *mn.prod[sc, t+1, s]/2 ) # end Poisson
+                                    *(mn.prod[sc, t+1, s]/2) ) # end Poisson
           # Abundance of nonbreeders
           ## Second year nonbreeders
           N[sc, 2, t+1, s] ~ dbin(mn.phiFY[sc, t, s]*(1-mn.psiFYB[sc, t, s]), NFY[sc, t, s]) # Nestlings to second year nonbreeders
@@ -405,7 +407,7 @@ mycode <- nimbleCode(
     
     # Future survival, recruitment, and detection
     for(sc in 1:6){ 
-      for (t in (nyr):(nyr+K)){
+      for (t in nyr:(nyr+K)){
         for (s in 1:nsite){
           # calculate percent hacked
           # assigns a one (1.0 or 100%) if abundance is less than 10
@@ -539,8 +541,8 @@ run_pva <- function(info, datl, constl, code){
   
   #n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
   #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-  n.chains=1; n.thin=1; n.iter=500; n.burnin=100
-  #n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
+  #n.chains=1; n.thin=1; n.iter=500; n.burnin=100
+  n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -570,17 +572,17 @@ run_pva <- function(info, datl, constl, code){
 } # run_pva function end
 
 
-this_cluster <- makeCluster(10)
+this_cluster <- makeCluster(cpus)
 post <- parLapply(cl = this_cluster, 
-                  X = par_info_pva, 
+                  X = par_info_pva[1:cpus], 
                   fun = run_pva, 
                   datl = datl, 
                   constl = constl, 
                   code = mycode)
 stopCluster(this_cluster)
 
-save(post, mycode, seeds,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_shortrun.rdata")
+save(post, mycode, seeds, cpus,
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva.rdata")
 
 # save(post, mycode,
 #      file="C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")

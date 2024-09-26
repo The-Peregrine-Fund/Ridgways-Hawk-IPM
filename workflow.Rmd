@@ -68,10 +68,6 @@ Other parameter estimates.
 ```{r,catplots3, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-# Stage Structure of Each Population
-```{r,popstructure, eval=TRUE, warning=FALSE, message=FALSE}
-```
-
 # Correlations between population growth rates and demographics
 ```{r,popgrowth, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 5)}
 ```  

@@ -268,15 +268,15 @@ plt(object=out,
 par(mfrow=c(1,1))
 plt(object=out, 
     params=c("lmu.prod"), 
-    labels= c("Fecundity\n(log scale)\nLos Haitises",
-              "Fecundity\n(log scale)\nPunta Cana"))
+    labels= c("Productivity\n(log scale)\nLos Haitises",
+              "Productivity\n(log scale)\nPunta Cana"))
 
 f <- exp(outp$lmu.prod)
 
 # Is fecundity at LHNP greater than PC
 par(mfrow=c(1,1))
 fdiff <- f[1,]-f[2,]
-hist(fdiff, main="Fecundity difference")
+hist(fdiff, main="Productivity difference")
 abline(v=0, lty=2)
 # print probability of direction, similar to frequentist p-value
 # so values <=0.025 and >=0.975
@@ -303,7 +303,7 @@ plt(object=out, params=sds,
     labels=c("FY survival", "NB survival", "B survival",
              "FY to B", "NB to B", "B to NB",
              "NB detection", "B detection",
-             "Fecundity"))
+             "Productivity"))
 sds2 <- paste0("sds2[", 1:9, "]")
 plt(object=out, params=sds2,
     exact=TRUE, ISB=FALSE,
@@ -311,7 +311,7 @@ plt(object=out, params=sds2,
     labels=c("FY survival", "NB survival", "B survival",
              "FY to B", "NB to B", "B to NB",
              "NB detection", "B detection",
-             "Fecundity"))
+             "Productivity"))
 # Correlations among vital rates
 # Plot is messy with only a few strong correlations
 ind <- 1
@@ -374,7 +374,7 @@ plt(object=out, params="mn.pB", ylim=c(0,1),
 abline(v=13.5, lwd=2)
 plt(object=out, params="mn.prod",
     main="", labels=labs,
-    xlab = "Year", ylab= "Fecundity")
+    xlab = "Year", ylab= "Productivity")
 abline(v=13.5, lwd=2)
 
 
@@ -454,7 +454,7 @@ plot.cor <- function (lambda, x, x.lab, ind.x=1:12){
 # the magnitude of the correlation
 # P(r>0) is the probability of direction (similar to p-values)
 # that is, the probability that an effect exists
-plot.cor(outp$lambda, outp$mn.prod, x.lab="Fecundity", ind.x=2:13)
+plot.cor(outp$lambda, outp$mn.prod, x.lab="Productivity", ind.x=2:13)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival")
 plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival")
 plot.cor(outp$lambda, outp$mn.phiB, x.lab="Breeder Survival")
@@ -662,4 +662,4 @@ fit.check(out, ratio=F,
           name.rep="f.dmape.rep", 
           name.obs="f.dmape.obs",
           ind=1,
-          lab="Fecundity-Neg binomial", jit=300)
+          lab="Productivity-Neg binomial", jit=300)

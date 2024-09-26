@@ -6,15 +6,20 @@ library ('MCMCvis')
 library ('coda')
 library ('ggplot2')
 library('reshape2')
-lapply(post, as.mcmc)
-
-# Identify chains with NAs that 
-# failed to initialize
+out <- lapply(post, as.mcmc)
+# Identify chains with NAs that failed to initialize
 NAlist <- c()
+NAdf <- data.frame(LH=NA, PC=NA)
+# find the "N[" parameters
+mx <- max(which(grepl("N\\[", colnames(out[[1]]))))
 for (i in 1:length(out)){
-  NAlist[i] <- any (is.na(out[[i]][,1:9493]) | out[[i]][,1:9493]<0)
+  NAlist[i] <- any (is.na(out[[i]][,1:mx]) | out[[i]][,1:mx]<0)
+  # check for sites 
+  NAdf[i,1] <- any (is.na(out[[i]][,1:(mx/2)]) | out[[i]][,1:(mx/2)]<0)
+  NAdf[i,2] <- any (is.na(out[[i]][,(mx/2+1):mx]) | out[[i]][,(mx/2+1):mx]<0)
 }
 !NAlist
+!NAdf
 # Subset chains to those with good initial values
 out <- out[!NAlist]
 post2 <- post[!NAlist]
@@ -403,19 +408,26 @@ for (i in 1:(nrow(outp$R)-1)){
   R2s[ind] <- paste0("R2[",i,", ", j, "]")
   ind <- ind+1
   }}
-par(mfrow=c(1,1))
-plt(object=out, params=Rs, exact=TRUE, ISB=FALSE, 
+par(mfrow=c(2,1))
+plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE,
     main="Correlations btw demographic rates\n over time (synchrony)",
     xlab = "Rhos", guide_lines=TRUE)
-plt(object=out, params=R2s, exact=TRUE, ISB=FALSE, 
+plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE,
+    main="Correlations btw demographic rates\n over time (synchrony), continued...",
+    xlab = "Rhos", guide_lines=TRUE)
+par(mfrow=c(2,1))
+plt(object=out, params=R2s[1:18], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites",
+    xlab = "Rhos", guide_lines=TRUE)
+plt(object=out, params=R2s[19:36], exact=TRUE, ISB=FALSE, 
+    main="Correlations btw demographic rates\n over time and sites, continued ...",
     xlab = "Rhos", guide_lines=TRUE)
 # lmu.brood = mean brood size (log scale), 
 # sig.brood = SD among nests
 # mu.nest = mean nest success
 par(mfrow=c(1,1))
 plt(object=out, 
-    params=c("lmu.f"), 
+    params=c("lmu.prod"), 
     labels= c("Fecundity\n(log scale)\nLos Haitises",
               "Fecundity\n(log scale)\nPunta Cana"))
 
@@ -458,7 +470,7 @@ plt(object=out, params="mn.pB", ylim=c(0,1),
     main="Breeder", labels = labs,
     xlab = "Year", ylab= "Detection")
 abline(v=13.5, lwd=2)
-plt(object=out, params="mn.f",
+plt(object=out, params="mn.prod",
     main="", labels=labs,
     xlab = "Year", ylab= "Fecundity")
 abline(v=13.5, lwd=2)
@@ -533,7 +545,7 @@ MCMCsummary(post2, params = pars1[4],
 # Fecundity
 # modeled as log(f) = lmu.f[site] + gamma*treatment + eps[x,t] + eta[x,s,t]
 # log scale
-MCMCsummary(post2, params = "lmu.f", 
+MCMCsummary(post2, params = "lmu.prod", 
             digits=3, HPD = T, 
             hpd_prob = 0.80, pg0= TRUE)
 
@@ -610,19 +622,7 @@ fit.check <- function(out, ratio=FALSE,
   return(list('Bayesian p-value'=bp1))
 }
 
-# check goodness-of-fit for brood size
-# breeder, ind=1
-# fit.check(out, ratio=F,
-#           name.rep="dmape.rep", 
-#           name.obs="dmape.obs",
-#           ind=1,
-#           lab="Breeder counts- Poisson", jit=300)
-# # nonbreeder, ind=2
-# fit.check(out, ratio=F,
-#           name.rep="dmape.rep", 
-#           name.obs="dmape.obs",
-#           ind=2,
-#           lab="Nonbreeder counts- Poisson", jit=300)
+
 
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
