@@ -1,6 +1,6 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -475,6 +475,69 @@ plt(object=out, params="mn.prod",
     xlab = "Year", ylab= "Fecundity")
 abline(v=13.5, lwd=2)
 
+ps1 <- paste0("mn.prod[", 1, ", ", 1:113,", ", "1]")
+ps2 <- paste0("mn.prod[", 2, ", ", 1:113,", ", "1]")
+ps3 <- paste0("mn.prod[", 3, ", ", 1:113,", ", "1]")
+ps4 <- paste0("mn.prod[", 4, ", ", 1:113,", ", "1]")
+ps5 <- paste0("mn.prod[", 5, ", ", 1:113,", ", "1]")
+ps6 <- paste0("mn.prod[", 6, ", ", 1:113,", ", "1]")
+par(mfrow=c(2,3))
+plt(object=out, params=ps1,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps2,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps3,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps4,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps5,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps6,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+
+ps1 <- paste0("mn.prod[", 1, ", ", 1:113,", ", "2]")
+ps2 <- paste0("mn.prod[", 2, ", ", 1:113,", ", "2]")
+ps3 <- paste0("mn.prod[", 3, ", ", 1:113,", ", "2]")
+ps4 <- paste0("mn.prod[", 4, ", ", 1:113,", ", "2]")
+ps5 <- paste0("mn.prod[", 5, ", ", 1:113,", ", "2]")
+ps6 <- paste0("mn.prod[", 6, ", ", 1:113,", ", "2]")
+par(mfrow=c(2,3))
+plt(object=out, params=ps1,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps2,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps3,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps4,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps5,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
+plt(object=out, params=ps6,
+    exact=TRUE, ISB=FALSE,
+    main="", labels=2011:2123,
+    xlab = "Year", ylab= "Productivity")
 #### ----popstructure -----
 
 mdFY <-  apply(outp$NFY, c(1,2), median) 
@@ -574,14 +637,16 @@ MCMCsummary(post2, params = "R2",
             hpd_prob = 0.80, pg0= TRUE)
 
 #### ---- traceplots ------
-MCMCtrace(post2, pdf=FALSE, params= "sds")
-MCMCtrace(post2, pdf=FALSE, params= "sds2")
-MCMCtrace(post2, pdf=FALSE, params= "mus")
-MCMCtrace(post2, pdf=FALSE, params= "betas")
-MCMCtrace(post2, pdf=FALSE, params= "NF")
-MCMCtrace(post2, pdf=FALSE, params= "NFY")
-MCMCtrace(post2, pdf=FALSE, params= "NB")
-MCMCtrace(post2, pdf=FALSE, params= "R")
+MCMCtrace(post2, pdf=FALSE, params= "sds", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "sds2", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "mus", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "betas", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "gamma", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "deltas", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "NF", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "NFY", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "NB", Rhat=TRUE)
+MCMCtrace(post2, pdf=FALSE, params= "R", Rhat=TRUE)
 
 #### ---- fit ------
 # Goodness of fit check

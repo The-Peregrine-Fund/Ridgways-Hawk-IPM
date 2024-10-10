@@ -730,7 +730,6 @@ inits.func1 <- function (){
   r = mean(outp$r),
   N = outp$N[1:7,1:13,1:2, 
               sample(seq(1, 5200, by=400), 1, replace = F)] # sample from inits of chains that worked
-              
   )}
 
 

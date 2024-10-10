@@ -1,7 +1,5 @@
 #### ---- setup -------
-#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_simp.rdata")
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
-#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -505,7 +503,7 @@ pars1 <- c("sds", "sds2","mus", "betas",
 # FY to B recruitment, NB to B recruitent, B to NB recruitment,
 # Detection NB, Detection B
 
-MCMCsummary(post2, params = sds2, #c(sds, sds2), 
+MCMCsummary(post2, params = c(sds, sds2), 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
             hpd_prob = 0.95, pg0= TRUE,
@@ -630,34 +628,23 @@ fit.check <- function(out, ratio=FALSE,
   return(list('Bayesian p-value'=bp1))
 }
 
-# check goodness-of-fit for brood size
-# breeder, ind=1
-# fit.check(out, ratio=F,
-#           name.rep="dmape.rep", 
-#           name.obs="dmape.obs",
-#           ind=1,
-#           lab="Breeder counts- Poisson", jit=300)
-# # nonbreeder, ind=2
-# fit.check(out, ratio=F,
-#           name.rep="dmape.rep", 
-#           name.obs="dmape.obs",
-#           ind=2,
-#           lab="Nonbreeder counts- Poisson", jit=300)
-
+# Counts of adults (nonbreeders+breeders)
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=1,
           lab="Adults(Breeder+Nonbreeder)- Poisson", jit=300)
-# first-year, ind=2
-# poisson failed fit test bp=0
-# Currently running models to try and fix
+# Counts of first-year fledglings, ind=2
+# Poisson failed fit test bp=0
+# So we assigned negative binomial only for Punta Cana.
+# Los Haitises excluded from neg bin because no zeroes in counts. 
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=2,
           lab="First-year counts\nNeg binomial-Poisson", jit=300)
-# fecundity
+
+# Productivity
 fit.check(out, ratio=F,
           name.rep="f.dmape.rep", 
           name.obs="f.dmape.obs",

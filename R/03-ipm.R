@@ -1,13 +1,12 @@
-## ---- ipm1 --------
+## ---- ipm --------
 library('nimble')
 library('parallel')
 library ('coda')
-#load("data/data.rdata")
 load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
 
-#################################
-# The model
-####################################################
+#**********************
+#* Parameter descriptions
+#**********************
 # Mark-resight-recovery data
 #   Observations (po) = y  
 #     1 seen first-year (age=0, just before 1st b-day)
@@ -33,7 +32,21 @@ load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
 #   pFY: resight probability first-years
 #   pA: resight probability nonbreeders
 #   pB: resight probability breeders
+#   lmu.prod: mean productivity (males and females) per territory on the log scale
+#   sds: standard deviations for multivariate normal random effects for time and site
+#   R: correlation coefficients for multivariate normal random effects for time and site
+#   lambda: population growth rate (derived)
+#   extinct: binary indicator of extirpation at a site
+#   gamma: coefficient of effect from nest treatments
+#   betas: coefficient of effect from translocations
+#   deltas: coefficient of effect from survey effort
+#   mus: overall means for survival, recruitment, and detections
+#   r and rr: "r" parameter for negative binomial distribution
+#             also described as omega in manuscript
 
+#**********************
+#* Model code
+#**********************
 mycode <- nimbleCode(
   {
     ###################################################
@@ -41,15 +54,15 @@ mycode <- nimbleCode(
     ###################################################
     # survival, recruitment, and detection can be correlated
     for (k in 1:8){
-      betas[k] ~ dunif(-20, 20)  # prior for coefficients
-      deltas[k] ~ dunif(-20, 20)
+      betas[k] ~ dunif(-20, 20)  # prior for translocations coefficients
+      deltas[k] ~ dunif(-20, 20) # prior for survey effort coefficients
     } # k
     
     for (j in 1:8){
       for (s in 1:nsite){
         lmus[j,s] <- logit(mus[j,s])
-        mus[j,s] ~ dbeta(1,1) # prior for means
-      }}     # m population #s sex #h hacked
+        mus[j,s] ~ dbeta(1,1) # prior for overall means
+      }}     # 
     
     # Temporal random effects and correlations among all sites
     for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
@@ -85,17 +98,16 @@ mycode <- nimbleCode(
       }} #t
     
     ###############################
-    # Likelihood for fecundity
+    # Likelihood for productivity
     ###############################
-    # Priors for number of fledglings
-    # and nest success
+    # Priors
     for (s in 1:nsite){
       lmu.prod[s] ~ dnorm(0, sd=5)
     } # s
     gamma ~ dunif(-20, 20)
     rr ~ dexp(0.05)
     
-    # Fecundity       
+    # Productivity likelihood      
     for (k in 1:nnest){
       prod[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.prod[k])
@@ -104,7 +116,10 @@ mycode <- nimbleCode(
         eps[9, year.nest[k] ] + 
         eta[9, site.nest[k], year.nest[k] ] 
     } # k
-    # derive yearly brood size for population model
+    # Derive yearly productivity for population model
+    # need to reorder because nimble doesn't 
+    # handle nonconsecutive indices
+    # yrind.nest is a matrix of indices for each site
     for (t in 1:nyr){
       for (s in 1:nsite){
         for (xxx in 1:nest.end[t,s]){
@@ -113,7 +128,7 @@ mycode <- nimbleCode(
         mn.prod[t,s] <- mean( prodmat[t,s,1:nest.end[t,s]] )
       }} # s t
     
-    # GOF for number of fledglings
+    # GOF for productivity
     for (k in 1:nnest){
       f.obs[k] <- prod[k] # observed counts
       f.exp[k] <- mu.prod[k] # expected counts adult breeder
@@ -132,7 +147,7 @@ mycode <- nimbleCode(
     # Abundance for year=1
     for (v in 1:7){ 
       for (s in 1:nsite){
-        # subtract one because to allow dcat to include zero
+        # subtract one to allow dcat to include zero
         N[v, 1, s] <- N2[v, 1, s] - 1 
         N2[v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s]) # Priors differ for FYs and adults
       }} # s t
@@ -145,32 +160,25 @@ mycode <- nimbleCode(
                                  NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s])) # breeders remaining
                               *mn.prod[t+1, s]/2 ) # end Poisson
         # Abundance of nonbreeders
-        ## Second year nonbreeders
-        N[2, t+1, s] ~ dbin(mn.phiFY[t, s]*(1-mn.psiFYB[t, s]), NFY[t, s]) # Nestlings to second year nonbreeders
-        ## Adult nonbreeders
+        N[2, t+1, s] ~ dbin(mn.phiFY[t, s]*(1-mn.psiFYB[t, s]), NFY[t, s]) # Nestlings to nonbreeders
         N[3, t+1, s] ~ dbin(mn.phiA[t, s]*(1-mn.psiAB[t, s]), NF[t, s]) # Nonbreeders to nonbreeders
         N[4, t+1, s] ~ dbin(mn.phiB[t, s]*mn.psiBA[t, s], NB[t, s]) # Breeders to nonbreeders
         # Abundance of breeders
-        ## Second year breeders
         N[5, t+1, s] ~ dbin(mn.phiFY[t, s]*mn.psiFYB[t, s], NFY[t, s]) # Nestlings to second year breeders
-        ## Adult breeders
         N[6, t+1, s] ~ dbin(mn.phiA[t, s]*mn.psiAB[t, s], NF[t, s]) # Nonbreeder to breeder
         N[7, t+1, s] ~ dbin(mn.phiB[t, s]*(1-mn.psiBA[t, s]), NB[t, s]) # Breeder to breeder
       }} # s t
     
-    # Observation process    
+    # Count likelihoods, state-space model, and observation process    
     for (t in 1:nyr){
       for (s in 1:nsite){
         countsAdults[t, s] ~ dpois(lamAD[t, s]) # adult females 
-        # constrain N1+hacked.counts to be >=0
-        constraint_data[t, s] ~ dconstraint( (N[1, t, s] + hacked.counts[t, s]) >= 0 ) # Transfers translocated first-year females
+        constraint_data[t, s] ~ dconstraint( (N[1, t, s] + hacked.counts[t, s]) >= 0 ) # constrain N1+hacked.counts to be >=0
         NFY[t, s] <- N[1, t, s] + hacked.counts[t, s] # Transfers translocated first-year females
         NF[t, s] <- sum(N[2:4, t, s]) # number of adult nonbreeder females
         NB[t, s] <- sum(N[5:7, t, s]) # number of adult breeder females
         NAD[t, s] <- NF[t, s] + NB[t, s] # number of adults
         Ntot[t, s] <- sum(N[1:7, t, s]) # total number of females
-        #log(lamAD[t, s]) <- log(NAD[t, s]) + log(effort[t, s])
-        #log(lamFY[t, s]) <- log(N[1, t, s]) + log(effort[t, s])
         log(lamAD[t, s]) <- log(NAD[t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2
         log(lamFY[t, s]) <- log(N[1, t, s]) + deltas[3]*effort2[t, s] + deltas[4]*effort2[t, s]^2
         }# s
@@ -236,12 +244,11 @@ mycode <- nimbleCode(
     ################################
     # Likelihood for survival
     ################################ 
-    # Calculate an averages for sites
-    # each year for integration
+    # Calculate averages for sites each year for integration
     for (t in 1:nyr){
       for (s in 1:nsite){
         for (xxxx in 1:surv.end[t,s]){
-          # need to reorder because nimble doesn't 
+          # Reorder because nimble doesn't 
           # handle nonconsecutive indices
           # yrind.surv is a matrix of indices for each site
           phiFY2[ t, s, xxxx] <- phiFY[ yrind.surv[xxxx,t,s], t]
@@ -349,6 +356,9 @@ mycode <- nimbleCode(
     } #i
   } )
 
+#**********************
+#* Function to run model in NIMBLE
+#**********************
 run_ipm <- function(info, datl, constl, code){
   library('nimble')
   library('coda')
@@ -365,7 +375,8 @@ run_ipm <- function(info, datl, constl, code){
     })
   assign('uppertri_mult_diag', uppertri_mult_diag, envir = .GlobalEnv)
   
-  params <- c(# pop growth 
+  params <- c(
+    # pop growth 
     "lambda",
     # fecundity
     "lmu.prod", "gamma", "rr", "mn.prod", 
@@ -389,9 +400,6 @@ run_ipm <- function(info, datl, constl, code){
     "tvm.obs", "tvm.rep",
     "tturn.obs", "tturn.rep"
   )
-  
-  #n.chains=1; n.thin=200; n.iter=500000; n.burnin=300000
-  #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
   #n.chains=1; n.thin=1; n.iter=500; n.burnin=100
   n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
   
@@ -422,6 +430,9 @@ run_ipm <- function(info, datl, constl, code){
   return(post)
 } # run_ipm function end
 
+#*****************
+#* Run chains in parallel
+#*****************
 this_cluster <- makeCluster(20)
 post <- parLapply(cl = this_cluster, 
                   X = par_info, 
@@ -430,6 +441,5 @@ post <- parLapply(cl = this_cluster,
                   constl = constl, 
                   code = mycode)
 stopCluster(this_cluster)
-
 save(post, mycode,
      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")

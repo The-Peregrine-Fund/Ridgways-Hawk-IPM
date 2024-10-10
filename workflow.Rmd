@@ -30,11 +30,57 @@ The full workflow below is visible as a html website at:
 
 A permanent archive and DOI is available at: https://zenodo.org/doi/XXXXX
 
------------------------------------------------------------------------ 
-# Plot model estimates
+-----------------------------------------------------------------------   
+# 1. Code for IPM and PVA
+## 1.1 Submodels without Integration
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/02-ipm-simp.R')
+```
+```{r,ipm-simp, eval=FALSE, warning=FALSE, message=FALSE}
+```
+
+## 1.2 Integrated Population Model
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/03-ipm.R')
+```
+```{r,ipm, eval=FALSE, warning=FALSE, message=FALSE}
+```
+
+## 1.3 Population Viability Analysis
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/04-pva.R')
+```
+```{r,pva, eval=FALSE, warning=FALSE, message=FALSE}
+```
+
+# Plot model estimates 
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/05-postprocess.R')
+```
+```{r,postprocess, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,popstructure, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,survival, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,productivity, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,cors, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+```{r,pva, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+
+# Diagnostics and detailed plots
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/modelcheck.R')
 ```
+
 ```{r,setup, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
