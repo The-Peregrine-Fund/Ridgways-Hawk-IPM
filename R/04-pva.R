@@ -17,8 +17,8 @@ for (sc in 1:6){
 }
 constl$hacked.counts <- hacked.counts
 datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) )
-#constl$treat.nest2 <- c(1, 0, 1, 1, 0, 1) # treated or not
-constl$treat.nest2 <- c(0, 1, 1, 0, 1, 1) # treated or not
+#constl$treat.pair2 <- c(1, 0, 1, 1, 0, 1) # treated or not
+constl$treat.pair2 <- c(0, 1, 1, 0, 1, 1) # treated or not
 constl$hacked2 <- c(0, 0, 0, 1, 1, 1) # scenario- hacked or not
 constl$effort2 <- rbind(constl$effort2, array(0, dim=c(constl$K,2), dimnames=list(2024:(2024+constl$K-1), c("LH", "PC"))))
 
@@ -199,24 +199,24 @@ mycode <- nimbleCode(
     rr ~ dexp(0.05)
     
     # Productivity likelihood       
-    for (k in 1:nnest){
+    for (k in 1:npairsobs){
       prod[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.prod[k])
-      log(mu.prod[k]) <- lmu.prod[site.nest[k]] +  
-        gamma*treat.nest[k] + 
-        eps[9, year.nest[k] ] + 
-        eta[9, site.nest[k], year.nest[k] ] 
+      log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
+        gamma*treat.pair[k] + 
+        eps[9, year.pair[k] ] + 
+        eta[9, site.pair[k], year.pair[k] ] 
     } # k
     # Derive yearly productivity for population model
     # need to reorder because nimble doesn't 
     # handle nonconsecutive indices
-    # yrind.nest is a matrix of indices for each site
+    # yrind.pair is a matrix of indices for each site
     for (t in 1:nyr){
       for (s in 1:nsite){
-        for (xxx in 1:nest.end[t,s]){
-          prodmat[t,s,xxx] <- mu.prod[ yrind.nest[xxx,t,s] ]
+        for (xxx in 1:pair.end[t,s]){
+          prodmat[t,s,xxx] <- mu.prod[ yrind.pair[xxx,t,s] ]
         } # xxx
-        mn.prod[1,t,s] <- mean( prodmat[t,s,1:nest.end[t,s]] )
+        mn.prod[1,t,s] <- mean( prodmat[t,s,1:pair.end[t,s]] )
         for(sc in 2:6){
           mn.prod[sc, t, s] <- mn.prod[1,t,s]
       }}} # s t
@@ -225,11 +225,12 @@ mycode <- nimbleCode(
         for (t in (nyr+1):(nyr+K) ){
           for (s in 1:nsite){
         # Calculate percent of nests treated 
-        perc.treat[sc, t, s] <- ( equals(s, 3) + equals(s, 6) ) + # If scenario =1 or 4, prop =1.0
-                                step( NB[sc, t, s]-10 ) * (10+0.001)/(NB[sc, t, s]+0.001) * ( (1-equals(s, 3)) + (1-equals(s, 6)) ) + # NB>=10, calculate proportion
-                                step( NB[sc, t, s]-1 ) * 1-step( NB[sc, t, s]-10 ) * ( (1-equals(s, 3)) + (1-equals(s, 6)) )  # NB>1 and NB<10 100%
+        sc.threesix[sc] <- ( equals(s, 3) + equals(s, 6) )
+        perc.treat[sc, t, s] <-  sc.three.six[sc] + # If scenario =3 or 6, prop =1.0
+                                step( NB[sc, t, s]-10 ) * (10+0.001)/(NB[sc, t, s]+0.001) * (1-sc.threesix[sc]) + # NB>=10, calculate proportion
+                                step( NB[sc, t, s]-1 ) * 1-step( NB[sc, t, s]-10 ) * (1-sc.threesix[sc])  # NB>1 and NB<10 100%
         log(mn.prod[sc, t, s]) <- lmu.prod[s] +  
-                              gamma*treat.nest2[sc]*perc.treat[sc, t, s] + 
+                              gamma*treat.pair2[sc]*perc.treat[sc, t, s] + 
                               eps[9, t] + 
                               eta[9, s, t] 
   }} } # s t sc

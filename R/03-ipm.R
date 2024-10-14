@@ -108,38 +108,38 @@ mycode <- nimbleCode(
     rr ~ dexp(0.05)
     
     # Productivity likelihood      
-    for (k in 1:nnest){
+    for (k in 1:npairsobs){
       prod[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.prod[k])
-      log(mu.prod[k]) <- lmu.prod[site.nest[k]] +  
-        gamma*treat.nest[k] + 
-        eps[9, year.nest[k] ] + 
-        eta[9, site.nest[k], year.nest[k] ] 
+      log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
+        gamma*treat.pair[k] + 
+        eps[9, year.pair[k] ] + 
+        eta[9, site.pair[k], year.pair[k] ] 
     } # k
     # Derive yearly productivity for population model
     # need to reorder because nimble doesn't 
     # handle nonconsecutive indices
-    # yrind.nest is a matrix of indices for each site
+    # yrind.pair is a matrix of indices for each site
     for (t in 1:nyr){
       for (s in 1:nsite){
-        for (xxx in 1:nest.end[t,s]){
-          prodmat[t,s,xxx] <- mu.prod[ yrind.nest[xxx,t,s] ]
+        for (xxx in 1:pair.end[t,s]){
+          prodmat[t,s,xxx] <- mu.prod[ yrind.pair[xxx,t,s] ]
         } # xxx
-        mn.prod[t,s] <- mean( prodmat[t,s,1:nest.end[t,s]] )
+        mn.prod[t,s] <- mean( prodmat[t,s,1:pair.end[t,s]] )
       }} # s t
     
     # GOF for productivity
-    for (k in 1:nnest){
+    for (k in 1:npairsobs){
       f.obs[k] <- prod[k] # observed counts
       f.exp[k] <- mu.prod[k] # expected counts adult breeder
       f.rep[k] ~ dnegbin(ppp[k], rr) # expected counts
       f.dssm.obs[k] <- abs( ( f.obs[k] - f.exp[k] ) / (f.obs[k]+0.001) )
       f.dssm.rep[k] <- abs( ( f.rep[k] - f.exp[k] ) / (f.rep[k]+0.001) )
     } # k
-    f.dmape.obs <- sum(f.dssm.obs[1:nnest])
-    f.dmape.rep <- sum(f.dssm.rep[1:nnest])
-    f.tvm.obs <- sd(brood[1:nnest])^2/mean(brood[1:nnest])
-    f.tvm.rep <- sd(f.rep[1:nnest])^2/mean(f.rep[1:nnest])
+    f.dmape.obs <- sum(f.dssm.obs[1:npairsobs])
+    f.dmape.rep <- sum(f.dssm.rep[1:npairsobs])
+    f.tvm.obs <- sd(brood[1:npairsobs])^2/mean(brood[1:npairsobs])
+    f.tvm.rep <- sd(f.rep[1:npairsobs])^2/mean(f.rep[1:npairsobs])
     
     ################################
     # Likelihood for counts

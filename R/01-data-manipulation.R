@@ -612,12 +612,12 @@ constl <- list( # survival
                 yrind.surv = yrind.surv,
                 surv.end = surv.end,
                 # productivity 
-                treat.nest = lp$treat,
-                nnest = nrow(lp),
-                year.nest = lp$year2,
-                yrind.nest = yrind.nest,
-                nest.end = nest.end,
-                site.nest = lp$site2,
+                treat.pair = lp$treat,
+                npairsobs = nrow(lp),
+                year.pair = lp$year2,
+                yrind.pair = yrind.nest,
+                pair.end = nest.end,
+                site.pair = lp$site2,
             
                 pPrior = pPrior,
                 p = p, # number of random yr effects
@@ -625,14 +625,7 @@ constl <- list( # survival
                 
                 s.end=s.end,
                 hacked = as.numeric(hacked.cov.survival)-1,
-                hacked.added = ha,
-                ha.ind = ha.mat,
-                ha.end = c(0, ha.end),
-                ha.ind2 = ha.mat2,
-                ha.end2 = c(13,7,9),
-                hacked.removed = hr, 
                 hacked.counts = as.matrix( hacked[,-1] ),
-                effort = data.frame(LH=effort$std.LH, PC=effort$std.PC, row.names=effort$Year),
                 effort2 = data.frame(LH=effort$std2.LH, PC=effort$std2.PC, row.names=effort$Year)
 )
 

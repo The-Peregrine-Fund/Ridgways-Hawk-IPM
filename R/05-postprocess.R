@@ -145,8 +145,9 @@ hdisB <- melt(hdiB)
 hdisF <- melt(hdiF)
 dfstages <- rbind(medFY, medB, medF)
 dfhdis <- rbind(hdisFY, hdisB, hdisF)
-dfstages$LHDI <- dfhdis[]
-dfstages$UHDI <- dfhdis[]
+dfstages$LHDI <- dfhdis[dfhdis$Var1=="lower",]
+dfstages$UHDI <- dfhdis[dfhdis$Var1=="upper",]
+library(viridis)
 cols <- mako(3)
 
 
@@ -187,7 +188,7 @@ p5 <- ggplot() + theme_minimal(base_size=14) +
   # stat_summary(data=lF, aes(x=Year, y=Abundance), 
   #              geom="line", linewidth=1,
   #              fun.data =function(x){data.frame(y=median(x))} ) +
-  color_scale_manual(cols) +
+  scale_color_manual(cols) +
   facet_wrap("Site", scales="free_y") +
   xlab("Year") + ylab("Number")
 p5
@@ -507,7 +508,7 @@ load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects
 out <- lapply(post, as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
 library (viridis)
-cols <- viridis(6)
+cols <- viridis(3)
 pe <- apply(outp$extinct, c(1,2,3), mean)
 
 # tiff(height=3, width=8, units="in", res=300,
@@ -524,12 +525,12 @@ axis(1, at=seq(2020, 2120, by=10),
      labels=c(2020, NA, 2040, NA, 2060, NA, 2080, NA, 2100, NA, 2120))
 abline(h=seq(0, 1, by=0.1), col="gray90")
 abline(v=seq(2030, 2130, by=10), col="gray90")
-lines(2024:2123, pe[2, ,1], col=cols[1], lwd=2)
-lines(2024:2123, pe[3, ,1], col=cols[2], lwd=2)
-lines(2024:2123, pe[1, ,1], col=cols[3], lwd=2)
-lines(2024:2123, pe[5, ,1], col=cols[4], lwd=2, lty=2)
-lines(2024:2123, pe[6, ,1], col=cols[5], lwd=2, lty=2)
-lines(2024:2123, pe[4, ,1], col=cols[6], lwd=2, lty=2)
+lines(2024:2123, pe[1, ,1], col=cols[1], lwd=2)
+lines(2024:2123, pe[2, ,1], col=cols[2], lwd=2)
+lines(2024:2123, pe[3, ,1], col=cols[3], lwd=2)
+lines(2024:2123, pe[4, ,1], col=cols[1], lwd=2, lty=2)
+lines(2024:2123, pe[5, ,1], col=cols[2], lwd=2, lty=2)
+lines(2024:2123, pe[6, ,1], col=cols[3], lwd=2, lty=2)
 
 plot(2024:2123, pe[1, ,2], 
      type="n", col=cols[1], lwd=2,
@@ -540,17 +541,17 @@ axis(1, at=seq(2020, 2120, by=10),
      labels=c(2020, NA, 2040, NA, 2060, NA, 2080, NA, 2100, NA, 2120))
 abline(h=seq(0, 1, by=0.1), col="gray90")
 abline(v=seq(2030, 2130, by=10), col="gray90")
-lines(2024:2123, pe[2, ,2], col=cols[1], lwd=2)
-lines(2024:2123, pe[3, ,2], col=cols[2], lwd=2)
-lines(2024:2123, pe[1, ,2], col=cols[3], lwd=2)
-lines(2024:2123, pe[5, ,2], col=cols[4], lwd=2, lty=2)
-lines(2024:2123, pe[6, ,2], col=cols[5], lwd=2, lty=3)
-lines(2024:2123, pe[4, ,2], col=cols[6], lwd=2, lty=4)
+lines(2024:2123, pe[1, ,2], col=cols[1], lwd=2)
+lines(2024:2123, pe[2, ,2], col=cols[2], lwd=2)
+lines(2024:2123, pe[3, ,2], col=cols[3], lwd=2)
+lines(2024:2123, pe[4, ,2], col=cols[1], lwd=2, lty=2)
+lines(2024:2123, pe[5, ,2], col=cols[2], lwd=2, lty=3)
+lines(2024:2123, pe[6, ,2], col=cols[3], lwd=2, lty=4)
 plot.new()
 legend(x=-0.3, y=0.5, title="Scenarios",
        legend=c("1 trans=0, nests=0", "2 trans=0, nests=10", "3 trans=0, nests=all",
                 "4 trans=10, nests=0", "5 trans=10, nests=10", "6 trans=10, nests=all"),
-       xpd=NA, col=cols, lty=c(1,1,1,2,2,2), lwd=2,
+       xpd=NA, col=c(cols, cols), lty=c(1,1,1,2,2,2), lwd=2,
        xjust=0, yjust=0.5)
 mtext("Future year", 1,  outer=TRUE, line=1, adj=0.39)
 mtext("Quasi-extinction probability", 2, outer=TRUE, line=1)
