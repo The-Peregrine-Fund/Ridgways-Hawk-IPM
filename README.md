@@ -17,11 +17,11 @@ Once loaded into R, for example load("data/data.Rdata"), the data are included i
 
 ## Metadata for Data (object "datl")
 * prod- long format data of the number of successfully fledged young by each pair each year.
-* y- Mark-recapture- A matrix of dimensions nind x nyr. Detections of individuals and their life stage. Coded as 1 = seen first-year fledgling, 2 = seen nonbreeder adult, 3 = seen breeder adult, and 4 = not seen.
-* countsAdults- A matrix of dimensions nyr x nsite. The number of breeder adults seen, divided by two and rounded.
-* countsFY- A matrix of dimensions nyr x nsite. The number of first-year fledglings seen, divided by two and rounded.
+* y- Mark-recapture- A matrix of dimensions nind by nyr. Detections of individuals and their life stage. Coded as 1 = seen first-year fledgling, 2 = seen nonbreeder adult, 3 = seen breeder adult, and 4 = not seen.
+* countsAdults- A matrix of dimensions nyr by nsite. The number of breeder adults seen, divided by two and rounded.
+* countsFY- A matrix of dimensions nyr by nsite. The number of first-year fledglings seen, divided by two and rounded.
 * mu.zeroes and mu.zeroes2 - A vector of length p. Zeroes input to specify zero-centered means for random effects from site and time.
-* constraint_data- A matrix of dimensions nyr x nsites. An index that indicated which data to constrain to be > zero. This constraint prevents negative numbers when hacking occurs. 
+* constraint_data- A matrix of dimensions nyr by nsites. An index that indicated which data to constrain to be > zero. This constraint prevents negative numbers when hacking occurs. 
 
 ## Metadata for Constants (object "constl")
 * nind- The number of individuals included in the mark-recapture-resight dataset.
@@ -40,6 +40,6 @@ Once loaded into R, for example load("data/data.Rdata"), the data are included i
 * pPrior- priors for abundance of each population segment when t=1.
 * p and p2- the number of random effects for multivariate normal distributions.
 * s.end- The end of each vector for priors for pPrior, that is the priors for abundance when t=1.
+* hacked- A matrix of dimensions nind x nyr. A categorical covariate indicating whether an individual was hacked (hacked=1) or not (hacked=0).
 * hacked.counts- The number of translocated individuals from (negative values) and to (positive values) each site.
-* effort2- Number of surveyor days, centered on the mean, and scaled. Punta Cana was considered a census so we imputed zeroes for that site. We also imputed the mean survey effort (0) for early years at Los Haitises because these count data were removed and appeared to be biased.
-* 
+* effort2- Number of surveyor days, centered on the mean, and scaled. Punta Cana was considered a census so we imputed zeroes for that site. We also imputed the mean survey effort (effort=0) for early years at Los Haitises because these count data were removed and appeared to be biased.
