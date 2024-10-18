@@ -375,123 +375,6 @@ plt(object=out, params="mn.prod",
     xlab = "Year", ylab= "Productivity")
 abline(v=13.5, lwd=2)
 
-
-#### ---- popgrowth --------
-# plot population growth rates and
-# correlations with demographics
-# 2012 represents the 
-# pop growth between breeding seasons of 2011-2012 etc.
-# A population growth rate >1 means the population is growing
-# while a pgr <1 means it's shrinking.
-lam.m <- apply(outp$lambda, c(1,2), median)
-lam.hdi <- apply(outp$lambda, c(1,2), HDInterval::hdi)
-par(mfrow=c(1,2))
-plot(2012:2023, lam.m[,1], type="b", pch=1, 
-     ylab="Population growth rate", xlab="Year", 
-     ylim=c(min(lam.hdi[,,1]), max(lam.hdi[,,1])),
-     main="Los Haitises")
-abline(h=1, lty=2)
-segments(x0=2012:2023, x1=2012:2023, 
-         y0 = lam.hdi[1,,1], y1= lam.hdi[2,,1])
-
-plot(2012:2023, lam.m[,2], type="b", pch=1, lty=1,
-     ylab="Population growth rate", xlab="Year",
-     ylim=c(min(lam.hdi[,,2]), max(lam.hdi[,,2])),
-     main="Punta Cana")
-abline(h=1, lty=2)
-segments(x0=2012:2023, x1=2012:2023, 
-         y0 = lam.hdi[1,,2], y1= lam.hdi[2,,2])
-
-# create a function to plot correlations
-# between demographics and population growth rates
-plot.cor <- function (lambda, x, x.lab, ind.x=1:12){
-  # calculate the correlation coefficient 
-  # over each iteration to propagate error
-  cor.post <- array(NA, dim=dim(lambda)[-1])
-  cor.est <- c(NA, NA)
-  for (s in 1:2){
-  for (i in 1:dim(lambda)[[3]]){
-    cor.post[s,i] <- cor(lambda[1:12,s,i], x[ind.x,s,i])
-  }}
-  cor.df <- data.frame(median= apply(cor.post, 1, median) |> round(2),
-             ldi=apply(cor.post, 1, HDInterval::hdi)[1,] |> round(2),
-             hdi=apply(cor.post, 1, HDInterval::hdi)[2,] |> round(2),
-             pd = apply(cor.post, 1, pd) |> round(2),
-             row.names=c("LH", "PC"))
-             
-  
-  lam.m <- apply(lambda, c(1,2), median)
-  lam.hdi <- apply(lambda, c(1,2), HDInterval::hdi)
-  x.m <- apply(x, c(1,2), median)
-  x.hdi <- apply(x, c(1,2), HDInterval::hdi)
-
-  par(mfrow=c(1,2))
-  for (s in 1:2){
-    x.lims <- c(min(x.hdi[,,s]), max(x.hdi[,,s]))
-    y.lims <- c(min(lam.hdi[,,s]), max(lam.hdi[,,s]))
-  plot(x.m[ind.x,s], lam.m[1:12,s], 
-       xlim= x.lims,
-       ylim= y.lims,
-       type="n", ylab="Population growth rate", xlab=x.lab, 
-       main=c("Los Haitises", "Punta Cana")[s])
-  points(x.m[ind.x,s], lam.m[1:12,s], pch=1)
-  segments(x0=x.hdi[1,ind.x,s], x1=x.hdi[2,ind.x,s], 
-            y0 = lam.m[,s], y1= lam.m[,s])
-  segments(x0=x.m[ind.x,s], x1=x.m[ind.x,s], 
-            y0 = lam.hdi[1,,s], y1= lam.hdi[2,,s])
-  text(x = x.lims[1], y = (y.lims[2]-y.lims[1])*0.9+y.lims[1], 
-       paste("r = ", cor.df$median[s], " (",cor.df$ldi[s],", ", cor.df$hdi[s], ")", sep=""), 
-       pos = 4, font = 3, cex = 1)
-  text(x = x.lims[1], y = (y.lims[2]-y.lims[1])*0.8+y.lims[1], paste("P(r>0) = ", cor.df$pd[s], sep=""), 
-       pos = 4, font = 3, cex = 1)
-  }
-}
-# Plor correlations between population grrowth rates
-# and demographics. 
-# "r" is a correlation coefficient and represents
-# the magnitude of the correlation
-# P(r>0) is the probability of direction (similar to p-values)
-# that is, the probability that an effect exists
-plot.cor(outp$lambda, outp$mn.prod, x.lab="Productivity", ind.x=2:13)
-plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival")
-plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival")
-plot.cor(outp$lambda, outp$mn.phiB, x.lab="Breeder Survival")
-plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder")
-plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder")
-# Breeder to nonbreeder didn't vary over time
-# Does the number of breeders correlate with pop growth?
-plot.cor(outp$lambda, outp$NB, x.lab="Breeder Abundance", ind.x=2:13)
-plot.cor(outp$lambda, outp$NF, x.lab="Nonbreeder Abundance", ind.x=2:13)
-plot.cor(outp$lambda, outp$NFY, x.lab="First-year Abundance", ind.x=2:13)
-plot.cor(outp$lambda, outp$Ntot, x.lab="All Stages Abundance", ind.x=2:13)
-
-# Plot correlation between translocation 
-# and population growth rates.
-ind.x <- 1:12
-lam.md <- apply(outp$lambda, c(1,2), median)
-lam.hdis <- apply(outp$lambda, c(1,2), HDInterval::hdi)
-plot(constl$hacked.counts[ind.x,1], lam.md[,1],
-     xlab="Number translocated", 
-     ylab="Population growth rate",
-     type="n",
-     xlim=c(min(constl$hacked.counts[,1]), max(constl$hacked.counts[,1])),
-     ylim=c(min(lam.hdis[,,1]), max(lam.hdis[,,1])),
-     main="Los Haitises")
-points(constl$hacked.counts[ind.x,1], lam.md[,1])
-segments(x0=constl$hacked.counts[ind.x,1], x1=constl$hacked.counts[ind.x,1], 
-         y0 = lam.hdis[1,,1], y1= lam.hdis[2,,1])
-plot(constl$hacked.counts[ind.x,2], lam.md[,2],
-     xlab="Number translocated", 
-     ylab="Population growth rate",
-     type="n",
-     xlim=c(min(constl$hacked.counts[,2]), max(constl$hacked.counts[,2])),
-     ylim=c(min(lam.hdis[,,2]), max(lam.hdis[,,2])),
-     main="Punta Cana")
-points(constl$hacked.counts[ind.x,2], lam.md[,2])
-segments(x0=constl$hacked.counts[ind.x,2], x1=constl$hacked.counts[ind.x,2], 
-         y0 = lam.hdis[1,,2], y1= lam.hdis[2,,2])  
-
-
 #### ---- paramests -------
 pars1 <- c("sds", "sds2","mus", "betas",
            "NFY", "NF", "NB", "Ntot", 
@@ -502,12 +385,6 @@ pars1 <- c("sds", "sds2","mus", "betas",
 # In this order: FY survival, NB survival, B survival, 
 # FY to B recruitment, NB to B recruitent, B to NB recruitment,
 # Detection NB, Detection B
-
-MCMCsummary(post2, params = c(sds, sds2), 
-            exact=TRUE, ISB=FALSE,
-            digits=2, HPD = T,
-            hpd_prob = 0.95, pg0= TRUE,
-            func=median, func_name="median")
 
 # Mus are means for 
 # mus[1, site] , where site=1 is LH and site=2 is PC
@@ -521,17 +398,12 @@ MCMCsummary(post2, params = c(sds, sds2),
 # Detection probability of breeders
 # modeled as logit(probability) = lmus[x,site] + betas[x]*translocated + eps[x,t] + eta[x,s,t]
 # except breeder to nonbreeder recruitment = lmus[6,site] 
-MCMCsummary(post2, params = pars1[3], 
+MCMCsummary(post2, params = "mus", 
             digits=3, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
-MCMCsummary(post2, params = "lmus", 
-            digits=3, HPD = T, 
-            hpd_prob = 0.95, pg0= TRUE,
-            func=median, func_name="median")
-
-MCMCsummary(post2, params = pars1[4], 
+MCMCsummary(post2, params = "betas", 
             digits=3, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
@@ -544,34 +416,26 @@ MCMCsummary(post2, params = "lmu.prod",
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
-# Estimates of population size
-# NFY= first year, 
-# NF = nonbreeders, 
-# NB=breeders,
-# Ntot=total
-# All are presented as N[time, site], 
-# where time 1=2011 ... 13=2023, 
-# site 1 = LH and site 2=PC
-MCMCsummary(post2, params = pars1[5:8], 
-            digits=2, HPD = T, 
-            hpd_prob = 0.95, pg0= TRUE,
-            func=median, func_name="median")
-
-MCMCsummary(post2, params = pars1[9:16], 
-            digits=2, HPD = T, 
-            hpd_prob = 0.95, pg0= TRUE,
-            func=median, func_name="median")
-
+# Effort effects on detections and resighting
 MCMCsummary(post2, params = "deltas", 
             digits=2, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
-# Correlations among demographic rates time (synchrony)
-MCMCsummary(post2, params = Rs,
+
+# Random effects for temporal synchrony and site x year. 
+MCMCsummary(post2, params = c(sds, sds2), 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
+
+# Correlations among demographic rates time (synchrony)
+MCMCsummary(post2, params = c(Rs, R2s),
+            exact=TRUE, ISB=FALSE,
+            digits=2, HPD = T,
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median")
+
 # Correlations among demographic rates site x time
 MCMCsummary(post2, params = R2s, 
             exact=TRUE, ISB=FALSE,
@@ -580,13 +444,12 @@ MCMCsummary(post2, params = R2s,
             func=median, func_name="median")
 
 #### ---- traceplots ------
-#MCMCtrace(post2, pdf=FALSE, params= "sds")
-MCMCtrace(post2, pdf=FALSE, params= "sds2")
-MCMCtrace(post2, pdf=FALSE, params= "mus")
-MCMCtrace(post2, pdf=FALSE, params= "betas")
-MCMCtrace(post2, pdf=FALSE, params= "NF")
-MCMCtrace(post2, pdf=FALSE, params= "NFY")
-MCMCtrace(post2, pdf=FALSE, params= "NB")
+MCMCtrace(post2, pdf=FALSE, params= "mus", Rhat=TRUE, priors=runif(20000, 0, 1), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "betas", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "sds", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "sds2", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
 MCMCtrace(post2, pdf=FALSE, params= "R2")
 
 #### ---- fit ------

@@ -9,8 +9,10 @@ cpus <- 10
 #**********************
 #* Extend "data" needed for PVA projections and scenarios
 #**********************
-hacked.counts <- array(0, dim=c(6, constl$nyr+constl$K, 3))
-for (sc in 1:6){
+constl$SC <- 12
+
+hacked.counts <- array(0, dim=c(constl$SC, constl$nyr+constl$K, 3))
+for (sc in 1:constl$SC){
   hacked.counts[sc,1:constl$nyr,1:3] <- constl$hacked.counts 
   hacked.counts[sc,14:(constl$nyr+constl$K),1:3] <- 
     c(0, 0, 0, 1, 1, 1)[sc]*cbind(rep(-10, constl$K), rep(10, constl$K), rep(0, constl$K) )
@@ -21,7 +23,9 @@ datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) 
 constl$treat.pair2 <- c(0, 1, 1, 0, 1, 1) # treated or not
 constl$hacked2 <- c(0, 0, 0, 1, 1, 1) # scenario- hacked or not
 constl$effort2 <- rbind(constl$effort2, array(0, dim=c(constl$K,2), dimnames=list(2024:(2024+constl$K-1), c("LH", "PC"))))
-
+# set number of treated nests for all scenarios
+constl$num.treated <- c(0, 10, 100, 0, 10, 100, 0, 10, 100, 0, 10, 100) # 100s sub in for All but are over-ridden in model code
+constl$treat.all <- c(0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1)
 #**********************
 #* Specify priors taken from posterior of IPM
 #**********************
@@ -43,8 +47,8 @@ lam <- apply(mn.lam, 1, mean)
 Ni.func <- function (){
   Ni <- outp$N[1:7,1:constl$nyr,1:2,
                sample(seq(1, 5200, by=400), 1, replace = F)]
-  Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,constl$K,0)))
-  for (sc in 1:6){
+  Ni.pva <- array(NA, dim=c(constl$SC, dim(Ni)+c(0,constl$K,0)))
+  for (sc in 1:constl$SC){
     Ni.pva[sc, 1:7, 1:constl$nyr, 1:2] <- Ni
     for (t in constl$nyr:(constl$nyr+constl$K)){
       for (s in 1:2){
@@ -173,7 +177,7 @@ mycode <- nimbleCode(
     #######################
     # Derived params
     #######################
-    for(sc in 1:6){
+    for(sc in 1:SC){
     for (s in 1:nsite){
       for (t in 1:(nyr-1+K)){
         lambda[sc, t, s] <-  Ntot[sc, t+1, s]/(Ntot[sc, t, s])
@@ -217,18 +221,17 @@ mycode <- nimbleCode(
           prodmat[t,s,xxx] <- mu.prod[ yrind.pair[xxx,t,s] ]
         } # xxx
         mn.prod[1,t,s] <- mean( prodmat[t,s,1:pair.end[t,s]] )
-        for(sc in 2:6){
+        for(sc in 2:SC){
           mn.prod[sc, t, s] <- mn.prod[1,t,s]
       }}} # s t
     # Future projections- fecundity
-      for(sc in 1:6){
+      for(sc in 1:SC){
         for (t in (nyr+1):(nyr+K) ){
           for (s in 1:nsite){
         # Calculate percent of nests treated 
-        sc.threesix[sc] <- ( equals(s, 3) + equals(s, 6) )
-        perc.treat[sc, t, s] <-  sc.three.six[sc] + # If scenario =3 or 6, prop =1.0
-                                step( NB[sc, t, s]-10 ) * (10+0.001)/(NB[sc, t, s]+0.001) * (1-sc.threesix[sc]) + # NB>=10, calculate proportion
-                                step( NB[sc, t, s]-1 ) * 1-step( NB[sc, t, s]-10 ) * (1-sc.threesix[sc])  # NB>1 and NB<10 100%
+        perc.treat[sc, t, s] <-  treat.all[sc] + # If scenario =3 or 6, prop =1.0
+                                step( NB[sc, t, s]-num.treated[sc] ) * (num.treated[sc] + 0.001)/(NB[sc, t, s]+0.001) * (1-treat.all[sc]) + # NB>=10, calculate proportion
+                                step( NB[sc, t, s]-1 ) * 1-step( NB[sc, t, s]-num.treated[sc] ) * (1-treat.all[sc])  # NB>1 and NB<10 100%
         log(mn.prod[sc, t, s]) <- lmu.prod[s] +  
                               gamma*treat.pair2[sc]*perc.treat[sc, t, s] + 
                               eps[9, t] + 
@@ -245,8 +248,8 @@ mycode <- nimbleCode(
         N[1, v, 1, s] <- N2[1, v, 1, s] - 1 
         N2[1, v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s])
         # Assign estimates for years with data to all scenarios
-        for (sc2 in 2:6){
-          N[sc2, v, 1, s] <- N[1, v, 1, s]
+        for (sc in 2:SC){
+          N[sc, v, 1, s] <- N[1, v, 1, s]
         }
       }} # s t
 
@@ -269,13 +272,13 @@ mycode <- nimbleCode(
         # Assign estimates for years with data to 
         # all scenarios
         for (v in 1:7){ 
-        for (sc2 in 2:6){
-          N[sc2, v, t+1, s] <- N[1, v, t+1, s]
-        } } # sc2
+        for (sc in 2:SC){
+          N[sc, v, t+1, s] <- N[1, v, t+1, s]
+        } } # sc
         }} # s t
 
   # Future projections- population model 
-    for (sc in 1:6){
+    for (sc in 1:SC){
       for (t in nyr:(nyr+K-1)){
         for (s in 1:nsite){
           # Number of wild born juvs
@@ -311,15 +314,15 @@ mycode <- nimbleCode(
         # constrain N1+hacked.counts to be >=0
         log(lamAD[1, t, s]) <- log(NAD[1, t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2
         log(lamFY[1, t, s]) <- log(N[1, 1, t, s]) + deltas[3]*effort2[t, s] + deltas[4]*effort2[t, s]^2
-        for (sc2 in 2:6){
-          lamAD[sc2, t, s] <- lamAD[1, t, s]
-          lamFY[sc2, t, s] <- lamFY[1, t, s]
-          NFY[sc2, t, s] <- NFY[1, t, s]
-          NF[sc2, t, s] <- NF[1, t, s]
-          NB[sc2, t, s] <- NB[1, t, s]
-          NAD[sc2, t, s] <- NAD[1, t, s]
-          Ntot[sc2, t, s] <- Ntot[1, t, s]
-        } # sc2
+        for (sc in 2:SC){
+          lamAD[sc, t, s] <- lamAD[1, t, s]
+          lamFY[sc, t, s] <- lamFY[1, t, s]
+          NFY[sc, t, s] <- NFY[1, t, s]
+          NF[sc, t, s] <- NF[1, t, s]
+          NB[sc, t, s] <- NB[1, t, s]
+          NAD[sc, t, s] <- NAD[1, t, s]
+          Ntot[sc, t, s] <- Ntot[1, t, s]
+        } # sc
       }# s
       # First-years at different sites have different distributions
       # for better model fit
@@ -330,7 +333,7 @@ mycode <- nimbleCode(
     r ~ dexp(0.05)
     
    # Future projections of counts 
-    for(sc in 1:6){
+    for(sc in 1:SC){
       for (t in (nyr+1):(nyr+K)){
         for (s in 1:nsite){
           # constrain N1+hacked.counts to be >=0, and allow it to shrink as the population shrinks
@@ -369,15 +372,15 @@ mycode <- nimbleCode(
         mn.psiBA[1, t, s] <- mean( psiBA2[ t, s, 1:surv.end[t,s] ] )
         mn.pA[1, t, s] <- mean( pA2[ t, s, 1:surv.end[t,s] ] )
         mn.pB[1, t, s] <- mean( pB2[ t, s, 1:surv.end[t,s] ] )
-        for (sc2 in 2:6){
-          mn.phiFY[sc2, t, s] <- mn.phiFY[1, t, s] 
-          mn.phiA[sc2, t, s] <- mn.phiA[1, t, s] 
-          mn.phiB[sc2, t, s] <- mn.phiB[1, t, s] 
-          mn.psiFYB[sc2, t, s] <- mn.psiFYB[1, t, s]
-          mn.psiAB[sc2, t, s] <- mn.psiAB[1, t, s]
-          mn.psiBA[sc2, t, s] <- mn.psiBA[1, t, s]
-          mn.pA[sc2, t, s] <- mn.pA[1, t, s]
-          mn.pB[sc2, t, s] <- mn.pB[1, t, s]
+        for (sc in 2:SC){
+          mn.phiFY[sc, t, s] <- mn.phiFY[1, t, s] 
+          mn.phiA[sc, t, s] <- mn.phiA[1, t, s] 
+          mn.phiB[sc, t, s] <- mn.phiB[1, t, s] 
+          mn.psiFYB[sc, t, s] <- mn.psiFYB[1, t, s]
+          mn.psiAB[sc, t, s] <- mn.psiAB[1, t, s]
+          mn.psiBA[sc, t, s] <- mn.psiBA[1, t, s]
+          mn.pA[sc, t, s] <- mn.pA[1, t, s]
+          mn.pB[sc, t, s] <- mn.pB[1, t, s]
         }
       }}
     
@@ -387,12 +390,12 @@ mycode <- nimbleCode(
         logit(phiFY[i,t]) <- eta[1, site[i,t],t] + eps[1,t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
         logit(phiA[i,t]) <- eta[2, site[i,t],t] + eps[2,t] + 
-          lmus[2, site[i,t]] +  betas[2]*hacked[i] # nonbreeder
+          lmus[2, site[i,t]] #+  betas[2]*hacked[i] # nonbreeder
         logit(phiB[i,t]) <- eta[3, site[i,t],t] + eps[3,t] + 
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
         logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + eps[4,t] + 
-          lmus[4, site[i,t]] + betas[4]*hacked[i] # first year to breeder
+          lmus[4, site[i,t]] #+ betas[4]*hacked[i] # first year to breeder
         logit(psiAB[i,t]) <- eta[5, site[i,t],t] + eps[5,t] + 
           lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
         logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
@@ -402,13 +405,13 @@ mycode <- nimbleCode(
           lmus[7, site[i,t]] + betas[7]*hacked[i] +
           deltas[5]*effort2[t, site[i,t]] + deltas[6]*effort2[t, site[i,t]]^2 # resight of nonbreeders
         logit(pB[i,t]) <- eta[8, site[i,t],t] + eps[8,t] + 
-          lmus[8, site[i,t]] + betas[8]*hacked[i] + 
+          lmus[8, site[i,t]] + #betas[8]*hacked[i] + 
           deltas[7]*effort2[t, site[i,t]] + deltas[8]*effort2[t, site[i,t]]^2 # resight of breeders
       }#t
     }#i
     
     # Future projections of survival, recruitment, and detection
-    for(sc in 1:6){ 
+    for(sc in 1:SC){ 
       for (t in nyr:(nyr+K)){
         for (s in 1:nsite){
           # Calculate percent hacked
@@ -425,12 +428,12 @@ mycode <- nimbleCode(
         logit(mn.phiFY[sc, t, s]) <- eta[1, s, t] + eps[1, t] + 
           lmus[1, s] + betas[1]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2)  # first year
         logit(mn.phiA[sc, t, s]) <- eta[2, s, t] + eps[2, t] + 
-          lmus[2, s] +  betas[2]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder
+          lmus[2, s] #+  betas[2]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder
         logit(mn.phiB[sc, t, s]) <- eta[3, s, t] + eps[3, t] + 
           lmus[3, s] + betas[3]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # breeder
         #Recruitment
         logit(mn.psiFYB[sc, t, s]) <- eta[4, s, t] + eps[4, t] + 
-          lmus[4, s] + betas[4]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2) # first year to breeder
+          lmus[4, s] #+ betas[4]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2) # first year to breeder
         logit(mn.psiAB[sc, t, s]) <- eta[5, s, t] + eps[5, t] + 
           lmus[5, s] + betas[5]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder to breeder
         logit(mn.psiBA[sc, t, s]) <- #eta[6, site[i,t],t] + eps[6,t] + 
@@ -439,7 +442,7 @@ mycode <- nimbleCode(
         logit(mn.pA[sc, t, s]) <- eta[7, s, t] + eps[7, t] + 
           lmus[7, s] + betas[7]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # resight of nonbreeders
         logit(mn.pB[sc, t, s]) <- eta[8, s, t] + eps[8, t] + 
-          lmus[8, s] + betas[8]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # resight of breeders
+          lmus[8, s] #+ betas[8]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # resight of breeders
         } # s
       } # t
     } # sc

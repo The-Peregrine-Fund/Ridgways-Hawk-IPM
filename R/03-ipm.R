@@ -400,8 +400,8 @@ run_ipm <- function(info, datl, constl, code){
     "tvm.obs", "tvm.rep",
     "tturn.obs", "tturn.rep"
   )
-  #n.chains=1; n.thin=1; n.iter=500; n.burnin=100
-  n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
+  n.chains=1; n.thin=1; n.iter=500; n.burnin=100
+  #n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -441,5 +441,5 @@ post <- parLapply(cl = this_cluster,
                   constl = constl, 
                   code = mycode)
 stopCluster(this_cluster)
-save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
+# save(post, mycode,
+#      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")

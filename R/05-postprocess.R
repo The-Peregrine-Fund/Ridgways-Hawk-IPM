@@ -5,13 +5,15 @@ library ('ggplot2')
 library('reshape2')
 library ("tidybayes")
 library ('bayestestR')
+library ("ggpubr")
+library("viridis")
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 load("data/data.rdata")
 out <- lapply(post, as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
 
 #********************
-#*Calculate summary stats
+#* Calculate summary stats
 #********************
 # Population growth rates
 mn.lambda <- apply(outp$lambda, c(2,3), mean)
@@ -102,9 +104,9 @@ ldat$year <- ldat$Year+2010
 # to plot an approximate population structure
 p3 <- ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=year)) + 
   geom_bar(position="fill", stat="identity") +
-  ylab("Proportion of population") + 
+  ylab("Proportion of population") + xlab("Year") +
   facet_wrap("Site") + 
-  theme_minimal(base_size=14)+ 
+  theme_minimal(base_size=14)+ theme(legend.position="top") +
   scale_fill_viridis_d(option = "mako")
 
 p4 <- ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=year)) + 
@@ -113,9 +115,6 @@ p4 <- ggplot(ldat, aes(fill=Stage, y=as.numeric(Number), x=year)) +
   facet_wrap("Site", scales = "free_y") + 
   theme_minimal(base_size=14 ) + theme(legend.position="top") + 
   scale_fill_viridis_d(option = "mako") 
-
-p3
-p4
 
 # plot with uncertainty
 lFY <- melt(outp$NFY)
@@ -129,7 +128,7 @@ lFY$Stage <- "First-year"
 lB$Stage <- "Breeder"
 lF$Stage <- "Nonbreeder"
 lALL <- rbind(lFY, lB, lF)
-lALL$Site <- ifelse(lALL==1, "Los Haitises", "Punta Cana")
+lALL$Site <- ifelse(lALL$Site==1, "Los Haitises", "Punta Cana")
 
 mdFY <-  apply(outp$NFY[1:13,,], c(1,2), median) 
 mdB <-  apply(outp$NB[1:13,,], c(1,2), median) 
@@ -147,56 +146,45 @@ dfstages <- rbind(medFY, medB, medF)
 dfhdis <- rbind(hdisFY, hdisB, hdisF)
 dfstages$LHDI <- dfhdis[dfhdis$Var1=="lower",]
 dfstages$UHDI <- dfhdis[dfhdis$Var1=="upper",]
-library(viridis)
 cols <- mako(3)
 
+med_hdis <- function(x, cm){
+  df <- data.frame(y=median(x),
+                   ymin=HDInterval::hdi(x, credMass=cm)[1],
+                   ymax=HDInterval::hdi(x, credMass=cm)[2] )
+}
 
+p5 <- ggplot() +  theme_minimal(base_size=14) +
+  theme(legend.position="none") +
+  geom_line(data=lALL, aes(x=Year, y=Abundance, 
+                           group=Iteration, color=Stage,
+                           alpha=Stage), 
+            linewidth=0.1) +
+  stat_summary(data=lALL, aes(x=Year, y=Abundance),
+               geom="errorbar", width=0,
+               fun.data =med_hdis, fun.args=list(cm=0.95) ) +
+  stat_summary(data=lALL, aes(x=Year, y=Abundance),
+               geom="errorbar", width=0, linewidth=1,
+               fun.data =med_hdis, fun.args=list(cm=0.80) ) +
+  stat_summary(data=lALL, aes(x=Year, y=Abundance),
+               geom="line", linewidth=1,
+               fun.data =function(x){data.frame(y=median(x))} ) +
+  scale_color_manual( values = c("First-year"=cols[2], "Breeder"=cols[1], "Nonbreeder"=cols[3])  ) +
+  scale_alpha_manual( values = c("First-year"=0.015, "Breeder"=0.0075, "Nonbreeder"=0.15) ) +
+  facet_wrap(Stage~Site, scales="free_y", 
+             shrink=TRUE, ncol=2) +
+  xlab("Year") + ylab("Number of females") +
+  theme(
+    strip.background = element_blank(),
+    strip.text.x = element_blank()
+  )
 
-p5 <- ggplot() + theme_minimal(base_size=14) + 
-  geom_line(data=lALL, aes(x=Year, y=Abundance, group=interaction(Iteration, Stage), color=Stage), 
-            linewidth=0.1, alpha=0.01) +
-  geom_line(data=lALL, aes(x=Year, y=Abundance, group=interaction(Iteration, Stage), color=Stage), 
-            linewidth=0.1, alpha=0.01) +
-  # stat_summary(data=lFY, aes(x=Year, y=Abundance), 
-  #              geom="errorbar", width=0, 
-  #              fun.data =med_hdis, fun.args=list(cm=0.95) ) +
-  # stat_summary(data=lFY, aes(x=Year, y=Abundance), 
-  #              geom="errorbar", width=0, linewidth=1,
-  #              fun.data =med_hdis, fun.args=list(cm=0.80) ) +
-  # stat_summary(data=lFY, aes(x=Year, y=Abundance), 
-  #              geom="line", linewidth=1,
-  #              fun.data =function(x){data.frame(y=median(x))} ) +
-  # geom_line(data=lB, aes(x=Year, y=Abundance, group=Iteration), 
-  #         color="gray30", linewidth=0.1, alpha=0.01 ) +
-  # stat_summary(data=lB, aes(x=Year, y=Abundance), 
-  #              geom="errorbar", width=0, 
-  #              fun.data =med_hdis, fun.args=list(cm=0.95) ) +
-  # stat_summary(data=lB, aes(x=Year, y=Abundance), 
-  #              geom="errorbar", width=0, linewidth=1,
-  #              fun.data =med_hdis, fun.args=list(cm=0.80) ) +
-  # stat_summary(data=lB, aes(x=Year, y=Abundance), 
-  #              geom="line", linewidth=1,
-  #              fun.data =function(x){data.frame(y=median(x))} ) +
-  # geom_line(data=lB, aes(x=Year, y=Abundance, group=Iteration), 
-  #           color="gray30", linewidth=0.1, alpha=0.01 ) +
-  # stat_summary(data=lF, aes(x=Year, y=Abundance), 
-  #              geom="errorbar", width=0, 
-  #              fun.data =med_hdis, fun.args=list(cm=0.95) ) +
-  # stat_summary(data=lF, aes(x=Year, y=Abundance), 
-  #              geom="errorbar", width=0, linewidth=1,
-  #              fun.data =med_hdis, fun.args=list(cm=0.80) ) +
-  # stat_summary(data=lF, aes(x=Year, y=Abundance), 
-  #              geom="line", linewidth=1,
-  #              fun.data =function(x){data.frame(y=median(x))} ) +
-  scale_color_manual(cols) +
-  facet_wrap("Site", scales="free_y") +
-  xlab("Year") + ylab("Number")
-p5
-
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Stage structure.tiff",
-#        plot=p4,
+p35 <- ggarrange(p3, p5, ncol=1, nrow=2)
+p35
+# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Stage structure_abundance.tiff",
+#        plot=p35,
 #        device="tiff",
-#        width=6, height=4, dpi=300)
+#        width=6, height=8, dpi=300)
 
 #### ---- survival -----
 # plot survival, recruitment, and detection
@@ -475,7 +463,8 @@ plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, site=1, yaxt="b"){
 # that is, the probability that an effect exists
 # tiff(height=8, width=8, units="in", res=300,
 #      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics1.tiff")
-par(mfrow=c(4,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
+# par(mfrow=c(4,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
+par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
 plot.cor(outp$lambda, outp$mn.prod, x.lab="Fecundity", ind.x=2:13)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n")
 plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n")
@@ -495,7 +484,7 @@ plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n", site=
 plot.cor(outp$lambda, outp$mn.phiB, x.lab="Breeder Survival", site=2)
 plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", site=2)
 plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n", site=2)
-mtext("", side=2, outer=TRUE, line=2.5, cex=2)
+mtext("Population growth rate", side=2, outer=TRUE, line=2.5, cex=2)
 mtext("Punta Cana", side=3, outer=TRUE, cex=2)
 #dev.off()
 
