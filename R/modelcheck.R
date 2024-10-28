@@ -294,14 +294,14 @@ plt(object=out,
     main="Anti-Parasitic Fly\nTreatment Effects", ylim=c(0,3))
 
 par(mfrow=c(1,1))
-sds <- paste0("sds[", 1:9, "]")
-plt(object=out, params=sds,
-    exact=TRUE, ISB=FALSE,
-    main="Temporal SDs (synchrony among sites)",
-    labels=c("FY survival", "NB survival", "B survival",
-             "FY to B", "NB to B", "B to NB",
-             "NB detection", "B detection",
-             "Productivity"))
+# sds <- paste0("sds[", 1:9, "]")
+# plt(object=out, params=sds,
+#     exact=TRUE, ISB=FALSE,
+#     main="Temporal SDs (synchrony among sites)",
+#     labels=c("FY survival", "NB survival", "B survival",
+#              "FY to B", "NB to B", "B to NB",
+#              "NB detection", "B detection",
+#              "Productivity"))
 sds2 <- paste0("sds2[", 1:9, "]")
 plt(object=out, params=sds2,
     exact=TRUE, ISB=FALSE,
@@ -320,13 +320,13 @@ for (i in 1:(nrow(outp$R)-1)){
   R2s[ind] <- paste0("R2[",i,", ", j, "]")
   ind <- ind+1
   }}
-par(mfrow=c(2,1))
-plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE,
-    main="Correlations btw demographic rates\n over time (synchrony)",
-    xlab = "Rhos", guide_lines=TRUE)
-plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE,
-    main="Correlations btw demographic rates\n over time (synchrony), continued...",
-    xlab = "Rhos", guide_lines=TRUE)
+# par(mfrow=c(2,1))
+# plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE,
+#     main="Correlations btw demographic rates\n over time (synchrony)",
+#     xlab = "Rhos", guide_lines=TRUE)
+# plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE,
+#     main="Correlations btw demographic rates\n over time (synchrony), continued...",
+#     xlab = "Rhos", guide_lines=TRUE)
 par(mfrow=c(2,1))
 plt(object=out, params=R2s[1:18], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites",
@@ -376,11 +376,6 @@ plt(object=out, params="mn.prod",
 abline(v=13.5, lwd=2)
 
 #### ---- paramests -------
-pars1 <- c("sds", "sds2","mus", "betas",
-           "NFY", "NF", "NB", "Ntot", 
-           "mn.phiFY","mn.phiA", "mn.phiB", 
-           "mn.psiFYB", "mn.psiAB", "mn.psiBA", 
-           "mn.pA", "mn.pB")
 # Estimates for the survival model 
 # In this order: FY survival, NB survival, B survival, 
 # FY to B recruitment, NB to B recruitent, B to NB recruitment,
@@ -423,14 +418,7 @@ MCMCsummary(post2, params = "deltas",
             func=median, func_name="median")
 
 # Random effects for temporal synchrony and site x year. 
-MCMCsummary(post2, params = c(sds, sds2), 
-            exact=TRUE, ISB=FALSE,
-            digits=2, HPD = T,
-            hpd_prob = 0.95, pg0= TRUE,
-            func=median, func_name="median")
-
-# Correlations among demographic rates time (synchrony)
-MCMCsummary(post2, params = c(Rs, R2s),
+MCMCsummary(post2, params = sds2, 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
             hpd_prob = 0.95, pg0= TRUE,

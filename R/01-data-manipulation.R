@@ -674,13 +674,13 @@ library ('MCMCvis')
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_simp.rdata")
 repro <- MCMCsummary(post, params = c("lmu.f", "gamma", "rr"))
 mus <- MCMCsummary(post, params = "mus")
-sds <- MCMCsummary(post, params = "sds")
+#sds <- MCMCsummary(post, params = "sds")
 sds2 <- MCMCsummary(post, params = "sds2")
 betas <- MCMCsummary(post, params = "betas")
-u <- MCMCpstr(post, "Ustar", type="chains")
-Ustar <- apply(u$Ustar, c(1,2), mean)
-Ustar <- abs(Ustar)
-diag(Ustar) <- 1
+# u <- MCMCpstr(post, "Ustar", type="chains")
+# Ustar <- apply(u$Ustar, c(1,2), mean)
+# Ustar <- abs(Ustar)
+# diag(Ustar) <- 1
 u2 <- MCMCpstr(post, "Ustar2", type="chains")
 Ustar2 <- apply(u2$Ustar2, c(1,2), mean)
 Ustar2 <- abs(Ustar2)
@@ -689,7 +689,7 @@ diag(Ustar2) <- 1
 # Get N inits from prelim runs that worked
 # I ran a model with 20 chains 200 posterior iters
 # and got 5 chains that worked.
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_shortrun_sync.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_shortrun.rdata")
 out <- lapply(post, as.mcmc)
 
 # Identify chains with NAs that 
@@ -714,15 +714,15 @@ inits.func1 <- function (){
   mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
   deltas = runif(8, -0.1, 0.1),
-  sds = sds$mean,
-  Ustar = Ustar,
+  #sds = sds$mean,
+  #Ustar = Ustar,
   sds2 = sds2$mean,
   Ustar2 = Ustar2,
   # counts
   countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
   r = mean(outp$r),
   N = outp$N[1:7,1:13,1:2, 
-              sample(seq(1, 5200, by=400), 1, replace = F)] # sample from inits of chains that worked
+              sample(seq(1, 4000, by=400), 1, replace = F)] # sample from inits of chains that worked
   )}
 
 
@@ -788,8 +788,8 @@ inits.func.pva <- function (){
     mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
     betas = betas$mean,
     deltas = runif(8, -1, 1),
-    sds = sds$mean,
-    Ustar = Ustar,
+    #sds = sds$mean,
+    #Ustar = Ustar,
     sds2 = sds2$mean,
     Ustar2 = Ustar2,
     # counts
@@ -821,7 +821,8 @@ save(datl, constl, outp,
      par_info, par_info_pva,
      inits.func1, inits.func1, inits.func.pva, 
      z, seeds, 
-     repro, mus, sds, sds2, Ustar, Ustar2, betas, # return estimates from Iipm_simp for initial values
+     repro, mus, #sds, Ustar,
+     sds2, Ustar2, betas, # return estimates from Iipm_simp for initial values
      file="data\\data.rdata")
 
 #*********************

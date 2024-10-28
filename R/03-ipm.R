@@ -64,17 +64,17 @@ mycode <- nimbleCode(
         mus[j,s] ~ dbeta(1,1) # prior for overall means
       }}     # 
     
-    # Temporal random effects and correlations among all sites
-    for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
-    # estimated using the multivariate normal distribution
-    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # multivariate normal for temporal variance
-    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
-      eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-                          cholesky = U[1:p, 1:p], prec_param = 0)
-    }
+    # # Temporal random effects and correlations among all sites
+    # for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
+    # # estimated using the multivariate normal distribution
+    # R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
+    # Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
+    # U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
+    # # multivariate normal for temporal variance
+    # for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
+    #   eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
+    #                       cholesky = U[1:p, 1:p], prec_param = 0)
+    # }
     
     # Temporal random effects and correlations between sites
     for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation
@@ -113,7 +113,7 @@ mycode <- nimbleCode(
       ppp[k] <- rr/(rr+mu.prod[k])
       log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
         gamma*treat.pair[k] + 
-        eps[9, year.pair[k] ] + 
+        #eps[9, year.pair[k] ] + 
         eta[9, site.pair[k], year.pair[k] ] 
     } # k
     # Derive yearly productivity for population model
@@ -273,24 +273,24 @@ mycode <- nimbleCode(
     for (i in 1:nind){
       for (t in 1:nyr){
         #Survival
-        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + eps[1,t] + 
+        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + # eps[1,t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eta[2, site[i,t],t] + eps[2,t] + 
+        logit(phiA[i,t]) <- eta[2, site[i,t],t] + #eps[2,t] + 
           lmus[2, site[i,t]] +  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eta[3, site[i,t],t] + eps[3,t] + 
+        logit(phiB[i,t]) <- eta[3, site[i,t],t] + #eps[3,t] + 
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + eps[4,t] + 
+        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + #eps[4,t] + 
           lmus[4, site[i,t]] + betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + eps[5,t] + 
+        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + #eps[5,t] + 
           lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
         logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
           lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eta[7, site[i,t],t] + eps[7,t] + 
+        logit(pA[i,t]) <- eta[7, site[i,t],t] + #eps[7,t] + 
           lmus[7, site[i,t]] + betas[7]*hacked[i] +
           deltas[5]*effort2[t, site[i,t]] + deltas[6]*effort2[t, site[i,t]]^2# resight of nonbreeders
-        logit(pB[i,t]) <- eta[8, site[i,t],t] + eps[8,t] + 
+        logit(pB[i,t]) <- eta[8, site[i,t],t] + #eps[8,t] + 
           lmus[8, site[i,t]] + betas[8]*hacked[i] + 
           deltas[7]*effort2[t, site[i,t]] + deltas[8]*effort2[t, site[i,t]]^2# resight of breeders
       }#t
@@ -387,7 +387,7 @@ run_ipm <- function(info, datl, constl, code){
     "r",
     "N", "Ntot",
     # error terms
-    "eps", "sds", "Ustar", "U", "R",
+    #"eps", "sds", "Ustar", "U", "R",
     "eta", "sds2", "Ustar2", "U2", "R2",
     # yearly summaries
     'mn.phiFY', 'mn.phiA', 'mn.phiB',
@@ -400,8 +400,9 @@ run_ipm <- function(info, datl, constl, code){
     "tvm.obs", "tvm.rep",
     "tturn.obs", "tturn.rep"
   )
-  n.chains=1; n.thin=1; n.iter=500; n.burnin=100
-  #n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
+  #n.chains=1; n.thin=1; n.iter=500; n.burnin=100
+  #n.chains=1; n.thin=200; n.iter=800000; n.burnin=600000
+  n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -433,7 +434,8 @@ run_ipm <- function(info, datl, constl, code){
 #*****************
 #* Run chains in parallel
 #*****************
-this_cluster <- makeCluster(20)
+par_info <- par_info[1:10]
+this_cluster <- makeCluster(10)
 post <- parLapply(cl = this_cluster, 
                   X = par_info, 
                   fun = run_ipm, 
@@ -441,5 +443,9 @@ post <- parLapply(cl = this_cluster,
                   constl = constl, 
                   code = mycode)
 stopCluster(this_cluster)
+
 # save(post, mycode,
-#      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
+#      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
+
+save(post, mycode,
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")

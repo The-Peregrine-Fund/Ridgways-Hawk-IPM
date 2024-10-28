@@ -62,16 +62,16 @@ mycode <- nimbleCode(
         mus[j,s] ~ dbeta(1,1) # prior for means
       }}     # m population #s sex #h hacked 
     
-    # Temporal random effects and correlations among all sites, synchrony
-    for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation estimated using the multivariate normal distribution
-    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # Multivariate normal for temporal variance
-    for (t in 1:nyr){ 
-      eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-                          cholesky = U[1:p, 1:p], prec_param = 0)
-    }
+    # # Temporal random effects and correlations among all sites, synchrony
+    # for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation estimated using the multivariate normal distribution
+    # R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
+    # Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
+    # U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
+    # # Multivariate normal for temporal variance
+    # for (t in 1:nyr){ 
+    #   eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
+    #                       cholesky = U[1:p, 1:p], prec_param = 0)
+    # }
     
     # Temporal random effects and correlations between sites
     for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation estimated using the multivariate normal distribution
@@ -96,38 +96,38 @@ mycode <- nimbleCode(
     rr ~ dexp(0.05)
     
     # Productivity likelihood      
-    for (k in 1:nnest){
+    for (k in 1:npairsobs){
       f[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.f[k])
-      log(mu.f[k]) <- lmu.f[site.nest[k]] +  
-        gamma*treat.nest[k] + 
-        eps[9, year.nest[k] ] + 
-        eta[9, site.nest[k], year.nest[k] ] 
+      log(mu.f[k]) <- lmu.f[site.pair[k]] +  
+        gamma*treat.pair[k] + 
+        #eps[9, year.pair[k] ] + 
+        eta[9, site.pair[k], year.pair[k] ] 
     } # k
     # Derive yearly brood size for population model
     # Need to reorder because nimble doesn't 
     # handle nonconsecutive indices
-    # yrind.nest is a matrix of indices for each site
+    # yrind.pair is a matrix of indices for each site
     for (t in 1:nyr){
       for (s in 1:nsite){
-        for (xxx in 1:nest.end[t,s]){
-          fecmat[t,s,xxx] <- mu.f[ yrind.nest[xxx,t,s] ]
+        for (xxx in 1:pair.end[t,s]){
+          fecmat[t,s,xxx] <- mu.f[ yrind.pair[xxx,t,s] ]
         } # xxx
-        mn.f[t,s] <- mean( fecmat[t,s,1:nest.end[t,s]] )
+        mn.f[t,s] <- mean( fecmat[t,s,1:pair.end[t,s]] )
       }} # s t
     
     # GOF for number of fledglings
-    for (k in 1:nnest){
+    for (k in 1:npairsobs){
       f.obs[k] <- f[k] # observed counts
       f.exp[k] <- mu.f[k] # expected counts adult breeder
       f.rep[k] ~ dnegbin(ppp[k], rr) # expected counts
       f.dssm.obs[k] <- abs( ( f.obs[k] - f.exp[k] ) / (f.obs[k]+0.001) )
       f.dssm.rep[k] <- abs( ( f.rep[k] - f.exp[k] ) / (f.rep[k]+0.001) )
     } # k
-    f.dmape.obs <- sum(f.dssm.obs[1:nnest])
-    f.dmape.rep <- sum(f.dssm.rep[1:nnest])
-    f.tvm.obs <- sd(brood[1:nnest])^2/mean(brood[1:nnest])
-    f.tvm.rep <- sd(f.rep[1:nnest])^2/mean(f.rep[1:nnest])
+    f.dmape.obs <- sum(f.dssm.obs[1:npairsobs])
+    f.dmape.rep <- sum(f.dssm.rep[1:npairsobs])
+    f.tvm.obs <- sd(brood[1:npairsobs])^2/mean(brood[1:npairsobs])
+    f.tvm.rep <- sd(f.rep[1:npairsobs])^2/mean(f.rep[1:npairsobs])
     
     ################################
     # Likelihood for counts
@@ -166,23 +166,23 @@ mycode <- nimbleCode(
     for (i in 1:nind){
       for (t in 1:nyr){
         #Survival
-        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + eps[1,t] + 
+        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + # eps[1,t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eta[2, site[i,t],t] + eps[2,t] + 
+        logit(phiA[i,t]) <- eta[2, site[i,t],t] +# eps[2,t] + 
           lmus[2, site[i,t]] +  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eta[3, site[i,t],t] + eps[3,t] + 
+        logit(phiB[i,t]) <- eta[3, site[i,t],t] +# eps[3,t] + 
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + eps[4,t] + 
+        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] +# eps[4,t] + 
           lmus[4, site[i,t]] + betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + eps[5,t] + 
+        logit(psiAB[i,t]) <- eta[5, site[i,t],t] +# eps[5,t] + 
           lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
         logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
           lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eta[7, site[i,t],t] + eps[7,t] + 
+        logit(pA[i,t]) <- eta[7, site[i,t],t] +# eps[7,t] + 
           lmus[7, site[i,t]] + betas[7]*hacked[i] # resight of nonbreeders
-        logit(pB[i,t]) <- eta[8, site[i,t],t] + eps[8,t] + 
+        logit(pB[i,t]) <- eta[8, site[i,t],t] +# eps[8,t] + 
           lmus[8, site[i,t]] + betas[8]*hacked[i] # resight of breeders
       }#t
     }#i
@@ -277,7 +277,7 @@ run_ipm <- function(info, datl, constl, code){
     # "r",
     # "N", "Ntot",
     # error terms
-    "eps", "sds", "Ustar", "U", "R",
+    #"eps", "sds", "Ustar", "U", "R",
     "eta", "sds2", "Ustar2", "U2", "R2",
     # yearly summaries
     'mn.phiFY', 'mn.phiA', 'mn.phiB',

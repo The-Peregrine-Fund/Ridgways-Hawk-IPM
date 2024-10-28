@@ -1,6 +1,7 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva.rdata")
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_shortrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -37,7 +38,16 @@ plt  <- function(object, params,...) {
   }
 
 #### ---- catplots1 -------
-
+pe <- apply(outp$extinct, c(1,2,3), mean)
+plot(2024:2123, pe[1, ,1], type="l", 
+     ylim=c(0,1),
+     ylab="Prob. of extinction", xlab="Year", main="Scenario 1")
+plot(2024:2123, pe[2, ,1], type="l", 
+     ylim=c(0,1),
+     ylab="Prob. of extinction", xlab="Year", main="Scenario 2")
+plot(2024:2123, pe[3, ,1], type="l", 
+     ylim=c(0,1),
+     ylab="Prob. of extinction", xlab="Year", main="Scenario 3")
 plot(2024:2123, pe[3, ,1], type="l", 
      ylim=c(0,1),
      ylab="Prob. of extinction", xlab="Year", main="Scenario 3")
@@ -50,6 +60,9 @@ plot(2024:2123, pe[5, ,1], type="l",
 plot(2024:2123, pe[6, ,1], type="l", 
      ylim=c(0,1),
      ylab="Prob. of extinction", xlab="Year", main="Scenario 6")
+plot(2024:2123, pe[7, ,1], type="l", 
+     ylim=c(0,1),
+     ylab="Prob. of extinction", xlab="Year", main="Scenario 7")
 
 plot(2024:2123, pe[1, ,2], type="l", 
      ylim=c(0,1),
@@ -69,6 +82,9 @@ plot(2024:2123, pe[5, ,2], type="l",
 plot(2024:2123, pe[6, ,2], type="l", 
      ylim=c(0,1),
      ylab="Prob. of extinction", xlab="Year", main="Scenario 6")
+plot(2024:2123, pe[7, ,2], type="l", 
+     ylim=c(0,1),
+     ylab="Prob. of extinction", xlab="Year", main="Scenario 7")
 
 
 par(mfrow=c(3,2))
@@ -121,7 +137,7 @@ plt(object=out,
     ylim=c(0,1))
 
 ##########################3
-par(mfrow=c(3,2))
+par(mfrow=c(4,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[1, ",1:113, ", 1]"), 
@@ -163,8 +179,14 @@ plt(object=out,
     main="All stages\n Los Haitises", 
     labels = 2011:2123,
     xlab = "Year", ylab= "Abundance")
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[7, ",1:113, ", 1]"), 
+    main="All stages\n Los Haitises", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
 
-par(mfrow=c(3,2))
+par(mfrow=c(4,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[1, ",1:113, ", 2]"), 
@@ -206,6 +228,13 @@ plt(object=out,
     main="All stages\n Punta Cana", 
     labels = 2011:2123,
     xlab = "Year", ylab= "Abundance")
+
+plt(object=out, 
+    exact=TRUE, ISB=FALSE, 
+    params=paste0("Ntot[7, ",1:113, ", 2]"), 
+    main="All stages\n Punta Cana", 
+    labels = 2011:2123,
+    xlab = "Year", ylab= "Abundance")
 # plt(object=out, 
 #     exact=TRUE, ISB=FALSE, 
 #     params=paste0("NB[1, ",1:113, ", 1]"), 
@@ -217,16 +246,16 @@ plt(object=out,
 par(mfrow=c(5,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("NFY[",1:13, ", 2]"), 
+    params=paste0("NFY[1, ",1:13, ", 2]"), 
     main="First-year (FY)\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, datl$counts[1,,2]+constl$hacked.counts[,2], 
+plot(2011:2023, datl$countsFY[,2]+constl$hacked.counts[,2], 
      ylab="Counts", type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("NF[",1:13, ", 2]"), 
+    params=paste0("NF[1, ",1:13, ", 2]"), 
     main="Adult nonbreeder (NB)\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
@@ -234,7 +263,7 @@ plot.new()
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("NB[",1:13, ", 2]"),
+    params=paste0("NB[1, ",1:13, ", 2]"),
     main="Adult breeder (B)\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
@@ -242,21 +271,19 @@ plot.new()
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("NAD[",1:13, ", 2]"), 
+    params=paste0("NAD[1, ",1:13, ", 2]"), 
     main="Adult Breeders and Nonbreeders\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
 plot(2011:2023, datl$countsAdults[,2], 
-     ylab="Counts", type="b")
+     ylab="Counts", xlab="", type="b")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("Ntot[",1:13, ", 2]"), 
+    params=paste0("Ntot[1, ",1:13, ", 2]"), 
     main="All stages\n Punta Cana", 
     labels = 2011:2023,
     xlab = "Year", ylab= "Abundance")
-plot(2011:2023, colSums(datl$counts[,,2]), 
-     ylab="Counts", type="b")
 
 #### ---- catplots2 -------
 # Finer population segments

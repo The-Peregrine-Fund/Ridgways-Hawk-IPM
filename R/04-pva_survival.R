@@ -2,25 +2,33 @@
 library('nimble')
 library('parallel')
 library ('coda')
+
 load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
 source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
-constl$K <- 100
-cpus <- 10
+load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
+
+# load("C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//ipm_longrun.rdata")
+# load("data//data.rdata")
+# library ("MCMCvis")
+
 #**********************
 #* Extend "data". Needed for PVA projections and scenarios
 #**********************
-constl$SC <- 7
+constl$K <- 100
+cpus <- 10
+constl$SC <- 8
 
-hacked.counts <- array(0, dim=c(7, constl$nyr+constl$K, 3))
-for (sc in 1:7){
+hacked.counts <- array(0, dim=c(constl$SC, constl$nyr+constl$K, 3))
+for (sc in 1:constl$SC){
   hacked.counts[sc,1:constl$nyr,1:3] <- constl$hacked.counts 
   hacked.counts[sc,14:(constl$nyr+constl$K),1:3] <- 
-    c(0, 0, 0, 0, 0, 0)[sc]*cbind(rep(0, constl$K), rep(0, constl$K), rep(0, constl$K) )
+    rep (0, constl$SC)[sc]*
+    cbind(rep(0, constl$K), rep(0, constl$K), rep(0, constl$K) )
 }
 constl$hacked.counts <- hacked.counts
 
 constl$multiplier <- c(1, 1.01, 1.03, 1.05, 1.07, 1.1, 1.15)
-constl$adder <- c(0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.10)
+constl$adder <- c(0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.10, 0.15)
 datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) )
 constl$effort2 <- rbind(constl$effort2, array(0, dim=c(constl$K,2), dimnames=list(2024:(2024+constl$K-1), c("LH", "PC"))))
 
@@ -28,7 +36,6 @@ constl$effort2 <- rbind(constl$effort2, array(0, dim=c(constl$K,2), dimnames=lis
 #* Specify priors taken from posterior of IPM
 #**********************
 #* This helps ensure that all chains run
-load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
 # Identify chains with NAs that failed to initialize
 out <- lapply(post, as.mcmc)
 NAlist <- c()
@@ -39,23 +46,27 @@ out <- out[!NAlist]
 outp <- MCMCpstr(out, type="chains")
 !NAlist
 
-mn.lam <- apply(outp$lambda, c(2,3), mean)
-lam <- apply(mn.lam, 1, mean)
-
 Ni.func <- function (){
-  Ni <- outp$N[1:7,1:constl$nyr,1:2,
-               sample(seq(1, 5200, by=400), 1, replace = F)]
+  # randomly select inits from ones that work
+  # Ni <- outp$N[1:7,1:constl$nyr,1:2,
+  #              sample(seq(1, 10000, by=100), 1, replace = F)]
+  # take the means of the posterior for inits
+  Ni <- apply(outp$N, c(1,2,3), mean) |> round()
+  # Adjust so that all numbers are >=0 after hacked birds are added
+  # tot <- Ni+hacked.counts[1,1:13,1:2] # do birds add up to >=0
+  # tot[ tot >=0 ] <- 0
+  # Ni <- Ni + abs(tot) + 1
   Ni.pva <- array(NA, dim=c(constl$SC, dim(Ni)+c(0,constl$K,0)))
   for (sc in 1:constl$SC){
     Ni.pva[sc, 1:7, 1:constl$nyr, 1:2] <- Ni
     for (t in constl$nyr:(constl$nyr+constl$K)){
       for (s in 1:2){
-      Ni.pva[sc, 1:7, t, s] <- Ni[1:7, 13, s] #round(Ni[1:7, 13, s]*lam[s]^(t-13))
+      Ni.pva[sc, 1:7, t, s] <- Ni[1:7, 13, s] 
     }}} # t sc
   return(Ni.pva)
 } # function
 
-u1 <- apply(outp$Ustar, c(1,2), mean)
+#u1 <- apply(outp$Ustar, c(1,2), mean)
 u2 <- apply(outp$Ustar2, c(1,2), mean)
 
 inits.func.pva <- function (){
@@ -69,10 +80,10 @@ inits.func.pva <- function (){
     mus = apply(outp$mus, c(1,2), mean), 
     betas = apply(outp$betas, 1, mean),
     deltas = apply(outp$deltas, 1, mean),
-    sds = apply(outp$sds, 1, mean),
-    Ustar = u1,
+    # sds = apply(outp$sds, 1, mean),
+    # Ustar = u1,
     sds2 =  apply(outp$sds2, 1, mean),
-    Ustar2 = u1,
+    Ustar2 = u2,
     # counts
     countsAdults= matrix(c(374, 335, 305, 295, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
     r = mean(outp$r),
@@ -148,17 +159,17 @@ mycode <- nimbleCode(
         mus[j,s] ~ dbeta(1,1) # prior for means
       }}     # m population #s sex #h hacked
     
-    # Temporal random effects and correlations among all sites
-    for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
-    # estimated using the multivariate normal distribution
-    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # multivariate normal for temporal variance
-    for (t in 1:(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
-      eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-                          cholesky = U[1:p, 1:p], prec_param = 0)
-    }
+    # # Temporal random effects and correlations among all sites
+    # for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
+    # # estimated using the multivariate normal distribution
+    # R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
+    # Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
+    # U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
+    # # multivariate normal for temporal variance
+    # for (t in 1:(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
+    #   eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
+    #                       cholesky = U[1:p, 1:p], prec_param = 0)
+    # }
     
     # Temporal random effects and correlations between sites
     for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation
@@ -206,7 +217,7 @@ mycode <- nimbleCode(
       ppp[k] <- rr/(rr+mu.prod[k])
       log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
         gamma*treat.pair[k] + 
-        eps[9, year.pair[k] ] + 
+        #eps[9, year.pair[k] ] + 
         eta[9, site.pair[k], year.pair[k] ] 
     } # k
     # Derive yearly productivity for population model
@@ -227,7 +238,7 @@ mycode <- nimbleCode(
         for (t in (nyr+1):(nyr+K) ){
           for (s in 1:nsite){
         log(mn.prod[sc, t, s]) <- lmu.prod[s] +  
-                              eps[9, t] + 
+                              # eps[9, t] + 
                               eta[9, s, t] 
   }} } # s t sc
     
@@ -330,7 +341,7 @@ mycode <- nimbleCode(
       for (t in (nyr+1):(nyr+K)){
         for (s in 1:nsite){
           # constrain N1+hacked.counts to be >=0, and allow it to shrink as the population shrinks
-          NFY[sc, t, s] <- N[sc, 1, t, s] # zero hacked  
+          NFY[sc, t, s] <- step( (N[sc, 1, t, s] + hacked.counts[sc, t, s]) ) * (N[sc, 1, t, s] + hacked.counts[sc, t, s])  
           NF[sc, t, s] <- sum(N[sc, 2:4, t, s]) # number of adult nonbreeder females
           NB[sc, t, s] <- sum(N[sc, 5:7, t, s]) # number of adult breeder females
           NAD[sc, t, s] <- NF[sc, t, s] + NB[sc, t, s] # number of adults
@@ -380,60 +391,61 @@ mycode <- nimbleCode(
     for (i in 1:nind){
       for (t in 1:(nyr-1)){
         #Survival
-        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + eps[1,t] + 
+        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + #eps[1,t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eta[2, site[i,t],t] + eps[2,t] + 
+        logit(phiA[i,t]) <- eta[2, site[i,t],t] + #eps[2,t] + 
           lmus[2, site[i,t]] #+  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eta[3, site[i,t],t] + eps[3,t] + 
+        logit(phiB[i,t]) <- eta[3, site[i,t],t] + #eps[3,t] + 
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + eps[4,t] + 
+        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + #eps[4,t] + 
           lmus[4, site[i,t]] #+ betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + eps[5,t] + 
+        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + #eps[5,t] + 
           lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
         logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
           lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eta[7, site[i,t],t] + eps[7,t] + 
+        logit(pA[i,t]) <- eta[7, site[i,t],t] + #eps[7,t] + 
           lmus[7, site[i,t]] + betas[7]*hacked[i] +
           deltas[5]*effort2[t, site[i,t]] + deltas[6]*effort2[t, site[i,t]]^2 # resight of nonbreeders
-        logit(pB[i,t]) <- eta[8, site[i,t],t] + eps[8,t] + 
+        logit(pB[i,t]) <- eta[8, site[i,t],t] + #eps[8,t] + 
           lmus[8, site[i,t]] + #betas[8]*hacked[i] + 
           deltas[7]*effort2[t, site[i,t]] + deltas[8]*effort2[t, site[i,t]]^2 # resight of breeders
       }#t
     }#i
     
     # Future projections of survival, recruitment, and detection
+    cap <- 0.97
     for(sc in 1:SC){ 
       for (t in nyr:(nyr+K)){
         for (s in 1:nsite){
         #Survival
-        mn.phiFY1[sc, t, s] <- exp( eta[1, s, t] + eps[1, t] + 
+        mn.phiFY1[sc, t, s] <- ilogit( eta[1, s, t] + #eps[1, t] + 
           lmus[1, s] ) + adder[sc]  
-        mn.phiA1[sc, t, s] <- exp( eta[2, s, t] + eps[2, t] + 
-          lmus[2, s]) + adder[sc]
-        mn.phiB1[sc, t, s] <- exp( eta[3, s, t] + eps[3, t] + 
+        mn.phiA1[sc, t, s] <- ilogit( eta[2, s, t] + #eps[2, t] + 
+          lmus[2, s] ) + adder[sc]
+        mn.phiB1[sc, t, s] <- ilogit( eta[3, s, t] + #eps[3, t] + 
           lmus[3, s] ) + adder[sc]
-        
-        mn.phiFY[sc, t, s] <- step(0.97-mn.phiFY1[sc, t, s]) * mn.phiFY1[sc, t, s] + 
-                              (1-step(0.97-mn.phiFY1[sc, t, s]))*0.97
-        mn.phiA[sc, t, s] <- step(0.97-mn.phiA1[sc, t, s]) * mn.phiA1[sc, t, s] + 
-                              (1-step(0.97-mn.phiA1[sc, t, s]))*0.97
-        mn.phiB[sc, t, s] <- step(0.97-mn.phiB1[sc, t, s]) * mn.phiB1[sc, t, s] + 
-                              (1-step(0.97-mn.phiB1[sc, t, s]))*0.97   
+        # enforce the cap
+        mn.phiFY[sc, t, s] <- step(cap - mn.phiFY1[sc, t, s]) * mn.phiFY1[sc, t, s] + 
+                              (1 - step(cap - mn.phiFY1[sc, t, s])) * cap
+        mn.phiA[sc, t, s] <- step(cap - mn.phiA1[sc, t, s]) * mn.phiA1[sc, t, s] + 
+                              (1 - step(cap - mn.phiA1[sc, t, s])) * cap
+        mn.phiB[sc, t, s] <- step(cap - mn.phiB1[sc, t, s]) * mn.phiB1[sc, t, s] + 
+                              (1 - step(cap - mn.phiB1[sc, t, s])) * cap   
   
         #Recruitment
-        mn.psiFYB[sc, t, s] <- exp( eta[4, s, t] + eps[4, t] + 
-          lmus[4, s] ) #+ betas[4]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2) # first year to breeder
-        mn.psiAB[sc, t, s] <- exp( eta[5, s, t] + eps[5, t] + 
-          lmus[5, s] )#+ betas[5]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder to breeder
-        mn.psiBA[sc, t, s] <- #eta[6, site[i,t],t] + eps[6,t] + 
-          exp( lmus[6, s] ) #+ betas[6]*hacked[i] # breeder to nonbreeder
+        logit( mn.psiFYB[sc, t, s] ) <- eta[4, s, t] + #eps[4, t] + 
+          lmus[4, s]  #+ betas[4]*hacked2[sc]*p.hackedFY[sc, t, s]*equals(s, 2) # first year to breeder
+        logit( mn.psiAB[sc, t, s] ) <- eta[5, s, t] + #eps[5, t] + 
+          lmus[5, s] #+ betas[5]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # nonbreeder to breeder
+        logit( mn.psiBA[sc, t, s] ) <- #eta[6, site[i,t],t] + eps[6,t] + 
+          lmus[6, s]  #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        mn.pA[sc, t, s] <- exp( eta[7, s, t] + eps[7, t] + 
-          lmus[7, s] ) #+ betas[7]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # resight of nonbreeders
-        mn.pB[sc, t, s] <- exp( eta[8, s, t] + eps[8, t] + 
-          lmus[8, s] ) #+ betas[8]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # resight of breeders
+        logit( mn.pA[sc, t, s] ) <- eta[7, s, t] + #eps[7, t] + 
+          lmus[7, s]  #+ betas[7]*hacked2[sc]*p.hackedA[sc, t, s]*equals(s, 2) # resight of nonbreeders
+        logit( mn.pB[sc, t, s] ) <- eta[8, s, t] + #eps[8, t] + 
+          lmus[8, s]  #+ betas[8]*hacked2[sc]*p.hackedB[sc, t, s]*equals(s, 2) # resight of breeders
         } # s
       } # t
     } # sc
@@ -528,7 +540,7 @@ run_pva <- function(info, datl, constl, code){
     "NB", "NF", "NFY", "N", "NAD", "Ntot",
     "r",
     # error terms
-    "eps", "sds", "Ustar", "U", "R",
+    #"eps", "sds", "Ustar", "U", "R",
     "eta", "sds2", "Ustar2", "U2", "R2",
     # yearly summaries
     'mn.phiFY', 'mn.phiA', 'mn.phiB',
@@ -537,8 +549,8 @@ run_pva <- function(info, datl, constl, code){
     # pva
     "extinct", "extinctAD", "extinctB"
   )
-  n.chains=1; n.thin=1; n.iter=500; n.burnin=100
-  #n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
+  #n.chains=1; n.thin=1; n.iter=50; n.burnin=25
+  n.chains=1; n.thin=400; n.iter=1000000; n.burnin=600000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -579,4 +591,6 @@ post <- parLapply(cl = this_cluster,
                   code = mycode)
 stopCluster(this_cluster)
 save(post, mycode, seeds, cpus,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_survival.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_survival_longrun.rdata")
+# save(post, mycode, seeds, cpus,
+#      file="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//pva_survival_longrun.rdata")
