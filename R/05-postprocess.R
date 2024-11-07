@@ -15,10 +15,27 @@ outp <- MCMCpstr(out, type="chains")
 #********************
 #* Calculate summary stats
 #********************
+#* Both sites
+Nall <- apply(outp$Ntot, c(1,3) , sum)
+l.all.post <- array(NA, dim=c(constl$nyr-1, ncol(Nall)) ) 
+for (t in 2:13){
+l.all.post[t-1, ]  <- Nall[t,] / Nall[t-1,]
+}
+l.mn <- apply(l.all.post, 2, mean)
+# Average annual changes
+median(l.mn)
+HDInterval::hdi(l.mn)
+
+# Change from 2011 to 2023
+l.all.post2  <- Nall[13,] / Nall[1,]
+median(l.all.post2)
+HDInterval::hdi(l.all.post2)
+
 # Population growth rates
 mn.lambda <- apply(outp$lambda, c(2,3), mean)
 (md.lambda <- apply(mn.lambda, 1, median))
 (hdi95.lambda <- apply(mn.lambda, 1, HDInterval::hdi))
+
 # Overall averages
 mn.mus <- apply(outp$mus, c(1,3), mean)
 (md.mus <- apply(mn.mus, 1, median))
@@ -40,15 +57,23 @@ df.sites
 
 (md.mus <- apply(outp$mus, c(1,2), median)) |> round(2)
 (hdi.mus <- apply(outp$mus, c(1,2), HDInterval::hdi)) |> round(2)
+
 #*******************
 #* Plot IPM results
 #*******************
 #Plot population size
+lNall <- melt(Nall)
+colnames(lNall) <- c("Time", "Iter", "Abundance")
+lNall$Site.ind <- 3; lNall$Site <- "Both"
+lNall <- lNall[,c(1,4,2,3,5)]
+
 Ntot <- outp$Ntot[1:13,,] # thin by 10 to speed up plotting
 lN <- melt(Ntot)
 colnames(lN) <- c("Time", "Site.ind", "Iter", "Abundance")
-lN$Year <- lN$Time + 2010
 lN$Site <- ifelse(lN$Site.ind==1, "Los Haitises", "Punta Cana")
+lN <- rbind(lN, lNall)
+
+lN$Year <- lN$Time + 2010
 
 med_hdis <- function(x, cm){
             df <- data.frame(y=median(x),
@@ -60,6 +85,9 @@ counts.tot <- datl$countsAdults+datl$countsFY+constl$hacked.counts[,-3]
 df.counts <- melt(counts.tot)
 colnames(df.counts) <- c("Year", "Site_ab", "Count")
 df.counts$Site <- ifelse(df.counts$Site_ab=="LHNP", "Los Haitises", "Punta Cana")
+
+df.counts.all <- data.frame(Year=2011:2023, Site_ab="Both", Count=counts.tot[,1] + counts.tot[,2], Site="Both" )
+df.counts <- rbind(df.counts, df.counts.all)
 
 p1 <- ggplot() + theme_minimal(base_size=14) + 
   geom_line(data=lN, aes(x=Year, y=Abundance, group=Iter), 
@@ -82,7 +110,7 @@ p1
 # ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance and counts.tiff",
 #        plot=p1,
 #        device="tiff",
-#        width=6, height=4, dpi=300)
+#        width=9, height=4, dpi=300)
 
 #### ----popstructure -----
 # Plot life stage structure
@@ -305,11 +333,11 @@ f2.md <- apply(f.pred, 1, median)
 f2.HDI80 <- apply(f.pred, 1, HDInterval::hdi, credMass=0.8)
 f2.HDI95 <- apply(f.pred, 1, HDInterval::hdi)
 
-# tiff(height=4, width=6, units="in", res=300,
-#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Fecundity_treatment.tiff")
+tiff(height=4, width=6, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Fecundity_treatment.tiff")
 par(mar=c(3,5,3,1), mfrow=c(1,1))
 plot(c(1, 2)-0.1, f.md, 
-     ylim=c(min(f.HDI95), max(f2.HDI95)),
+     ylim=c(0, 1.55),
      xlim=c(0.5, 2.5), 
      ylab="Productivity", xlab="",
      main="",
@@ -321,9 +349,9 @@ abline(v=1.5, col="black")
 axis(1, at=c(1,2), cex.axis=1,
      labels=c("Los Haitises\nNational Park","Punta Cana"),
      padj=0.5)
-axis(2, at=seq(0, 1.4, by=0.1), 
+axis(2, at=seq(0, 1.6, by=0.1), 
      cex.axis=1,
-     labels=c(0, NA, NA, NA, 0.4, NA, NA, NA, 0.8, NA, NA, NA, 1.2, NA, NA))
+     labels=c("0", NA, NA, NA, NA, "0.5", NA, NA, NA, NA, "1.0", NA, NA, NA, NA, "1.5", NA))
 lines(c(1,1)-0.1, f.HDI95[,1], lwd=2)
 lines(c(2,2)-0.1, f.HDI95[,2], lwd=2)
 lines(c(1,1)-0.1, f.HDI80[,1], lwd=4)
@@ -336,10 +364,10 @@ lines(c(1,1) +0.1, f2.HDI95[,1], lwd=3)
 lines(c(2,2) +0.1, f2.HDI95[,2], lwd=3)
 lines(c(1,1) +0.1, f2.HDI80[,1], lwd=6)
 lines(c(2,2) +0.1, f2.HDI80[,2], lwd=6)
-legend(x=1.5,y=1.65, pch=c(16,18), pt.cex=c(1.5,2.5), cex=1,
+legend(x=1.5,y=1.9, pch=c(16,18), pt.cex=c(1.5,2.5), cex=1,
        legend=c("Untreated", "Treated" ), 
        horiz=TRUE, xjust=0.5, xpd=NA)
-#dev.off()
+dev.off()
 
 # Calculate probability of direction
 f.diff <- f[1,]-f[2,]
@@ -358,10 +386,11 @@ median(f.pred[2,]/f[2,])
 #*******************
 # Correlations between demographic rates
 #*******************
-apply(outp$R, c(1,2), pd) 
-apply(outp$R2, c(1,2), pd) 
-
-median(outp$R2[7,8,]) 
+pdR2 <- apply(outp$R2, c(1,2), pd) |> round(2)
+max(pdR2[pdR2<1])
+apply(outp$R2, c(1,2), median) |> round(2)
+apply(outp$R2, c(1,2), HDInterval::hdi)[1,,] |> round(2)
+apply(outp$R2, c(1,2), HDInterval::hdi)[2,,] |> round(2)
 
 #### ---- cors -----
 #*******************
@@ -492,12 +521,16 @@ mtext("Punta Cana", side=3, outer=TRUE, cex=2)
 #*******************
 #* Plot PVA results
 #*******************
+library ('viridis')
+library ('coda')
+library ('MCMCvis')
 # Abundance of females at Los Haitises
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_longrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_longrun2.rdata")
 out <- lapply(post, as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
-library (viridis)
-cols <- rev(magma(7))
+
+cols <- rev(magma(8))
 pe <- apply(outp$extinct, c(1,2,3), mean)
 
 tiff(height=3, width=8, units="in", res=300,
@@ -521,6 +554,7 @@ lines(2024:2123, pe[4, ,1], col=cols[4], lwd=2)
 lines(2024:2123, pe[5, ,1], col=cols[5], lwd=2)
 lines(2024:2123, pe[6, ,1], col=cols[6], lwd=2)
 lines(2024:2123, pe[7, ,1], col=cols[7], lwd=2)
+lines(2024:2123, pe[8, ,1], col=cols[8], lwd=2)
 
 plot(2024:2123, pe[1, ,2], 
      type="n", col=cols[1], lwd=2,
@@ -538,15 +572,91 @@ lines(2024:2123, pe[4, ,2], col=cols[4], lwd=2)
 lines(2024:2123, pe[5, ,2], col=cols[5], lwd=2)
 lines(2024:2123, pe[6, ,2], col=cols[6], lwd=2)
 lines(2024:2123, pe[7, ,2], col=cols[7], lwd=2)
+lines(2024:2123, pe[8, ,2], col=cols[8], lwd=2)
 plot.new()
-legend(x=-0.3, y=0.5, title="Scenarios",
-       legend=c("+0", "+0.01", "+0.02",
-                "+0.03", "+0.04", "+0.05", "+0.10"),
+legend(x=-0.3, y=0.5, title="Survival increase",
+       legend=c("0", "0.01", "0.02",
+                "0.03", "0.04", "0.05", 
+                "0.10", "0.15"),
        xpd=NA, col=cols, lty=1, lwd=2,
        xjust=0, yjust=0.5)
 mtext("Future year", 1,  outer=TRUE, line=1, adj=0.39)
 mtext("Quasi-extinction probability", 2, outer=TRUE, line=1)
 dev.off()
+
+# 3D figure of quasi-extinction rates after 50 years. 
+df.pva <- read.csv("data//pva_scenarios.csv", header=TRUE)
+df.pva <- data.frame(scenario = 1:36,
+                     transl = rep(c(0,5,10), each=12), 
+                     treat= rep( rep(c(0, 15, 30, 45), each=3), 3),
+                     mort = rep(c(100, 80, 60), 12) )
+
+df100 <- df.pva[df.pva$mort=="100", ]
+qe100_LH <- array(0.5, dim = apply(df.pva, 2, function(x) length(unique(x)) )[-1], 
+            dimnames = apply(df.pva, 2, unique)[-1])
+qe100_PC <- array(0.5, dim = apply(df.pva, 2, function(x) length(unique(x)) )[-1], 
+                  dimnames = apply(df.pva, 2, unique)[-1] )
+
+for (i in 1:nrow(df100)){
+                          transl2 <- as.character( df100$transl[i] )
+                          treat2 <- as.character( df100$treat[i] )
+                          qe100_LH[transl2, treat2, 1] <- mean( outp$extinct[ df100$scenario[i], 50, 1] )
+                          qe100_PC[transl2, treat2, 1] <- mean( outp$extinct[ df100$scenario[i], 50, 2] )
+}
+
+tiff(height=3, width=8, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Quasiextinction_3d.tiff")
+par(mrfrow=c(3,2))
+
+persp(x=as.numeric(rownames(qe100_LH)), 
+      y = as.numeric(colnames(qe100_LH)), 
+      z = qe100_LH[,,1], zlim=c(0,1), 
+      col = scale_color_continuous( viridis) )
+
+#* ggplot version
+lpe <- melt(pe)
+colnames(lpe) <- c('Scenarios', 'Time', 'Site2', 'Extinct')
+scen <- data.frame('Scenarios' = 1:36,
+                   'Number translocated' = rep(c(0,5,10), each=12), 
+                   'Number of nests treated' = rep( rep(c(0, 15, 30, 45), each=3), 3),
+                   'Mortality reduction' = rep(c('Mortality=100%', 'Mortality=80%', 'Mortality=60%'), 12) )
+pe.df <- merge(lpe, scen, by='Scenarios', all.x=TRUE)
+pe.df$Year <- pe.df$Time+2023
+pe.df$Site <- ifelse(pe.df$Site2==1, "Los Haitises", "Punta Cana")
+#pe.df <- pe.df[!(pe.df$Site2==2 & pe.df$Number.translocated>0),]
+pe.df[(pe.df$Site2==2 & pe.df$Number.translocated>0),]$Extinct <- NA
+
+ggplot(pe.df, aes(x=Year, y=Extinct, group=Scenarios, 
+                  color = factor(Number.translocated), 
+                  linetype = factor(Number.of.nests.treated))) +
+  geom_line( linewidth = 1) +
+  facet_grid(rows=  vars(Site), cols= vars(Mortality.reduction),
+             scales='free_y') +
+  #facet_wrap(~  Site + Mortality.reduction) +
+  scale_color_viridis_d(option="viridis", direction=1,
+                        name="Number translocated") +
+  scale_linetype(name="Number of nests treated") +
+  theme_minimal() + theme(strip.background = element_rect(size = 0.5)) +
+  ylab("Quasi-extinction probability")
+
+pe.df2 <- pe.df[pe.df$Time==50, ]
+p7 <- ggplot(pe.df2, aes(x = as.factor(Number.translocated), 
+                  y = as.factor(Number.of.nests.treated),  
+                  fill = Extinct)) +
+  geom_tile( ) + 
+  scale_fill_viridis_c(option="plasma", direction=1,
+                       name = "Quasi-extinction\nprobability after\n50 years") +
+  facet_wrap(~  Site + factor(Mortality.reduction, 
+                              levels=c("Mortality=100%", "Mortality=80%", "Mortality=60%"))) +
+  scale_y_discrete(breaks=c(0,15,30,45), 
+                   name="Number of nests treated") +
+  scale_x_discrete(name="Number translocated") +
+  theme_minimal( ) + theme(strip.background = element_rect(size = 0.5))
+  
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Quasi-extinction_50yrHeatmap.tiff",
+       plot=p7,
+       device="tiff",
+       width=6, height=4, dpi=300)
 
 # Time to extinction
 # conditional on extinction threshold (D=X)

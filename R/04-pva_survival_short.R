@@ -176,7 +176,7 @@ mycode <- nimbleCode(
     for(sc in 1:SC){
     for (s in 1:nsite){
       for (t in 1:(nyr-1+K)){
-        lambda[sc, t, s] <-  Ntot[sc, t+1, s]/(Ntot[sc, t, s]) # population groewth rate
+        lambda[sc, t, s] <-  Ntot[sc, t+1, s]/(Ntot[sc, t, s]) # population growth rate
         loglambda[sc, t, s] <- log(lambda[sc, t, s]) # r
       }} #t
     
@@ -539,8 +539,8 @@ run_pva <- function(info, datl, constl, code){
     # pva
     "extinct", "extinctAD", "extinctB"
   )
-  #n.chains=1; n.thin=1; n.iter=50; n.burnin=25
-  n.chains=1; n.thin=400; n.iter=1000000; n.burnin=600000
+  n.chains=1; n.thin=1; n.iter=50; n.burnin=25
+  #n.chains=1; n.thin=400; n.iter=1000000; n.burnin=600000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -581,6 +581,6 @@ post <- parLapply(cl = this_cluster,
                   code = mycode)
 stopCluster(this_cluster)
 save(post, mycode, seeds, cpus,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_longrun.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_shortrun.rdata")
 # save(post, mycode, seeds, cpus,
 #      file="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//pva_survival_longrun.rdata")

@@ -1,6 +1,6 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_shortrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
@@ -38,53 +38,29 @@ plt  <- function(object, params,...) {
   }
 
 #### ---- catplots1 -------
+library (viridis)
 pe <- apply(outp$extinct, c(1,2,3), mean)
-plot(2024:2123, pe[1, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 1")
-plot(2024:2123, pe[2, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 2")
-plot(2024:2123, pe[3, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 3")
-plot(2024:2123, pe[3, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 3")
-plot(2024:2123, pe[4, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 4")
-plot(2024:2123, pe[5, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 5")
-plot(2024:2123, pe[6, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 6")
-plot(2024:2123, pe[7, ,1], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 7")
+yrs <- 2024:(2023+50)
+ltys <- rep(c(1,2,3), each=12)[i] # line types are translocations 0, 5, 10
+cols <- viridis(4) # colors are nest treatments 0, 15, 30, 45
 
-plot(2024:2123, pe[1, ,2], type="l", 
+plot(yrs, pe[1, ,1], type="l", 
+     col= cols[1], lty= 1, lwd=2,
+     ylim=c(0,0.35),
+     ylab="Prob. of extinction", xlab="Year", main="")
+for (i in 2:36){
+  lines(yrs, pe[i, ,1], 
+        col=cols[ rep( rep(c(1,2,3,4), each=3), 3)[i] ], lty=rep(c(1,2,3), each=12)[i], lwd=2)
+}     
+
+plot(yrs, pe[1, ,2], type="l", 
+     col= cols[1], lty= 1, lwd=2,
      ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 1")
-plot(2024:2123, pe[2, ,2], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 2")
-plot(2024:2123, pe[3, ,2], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 3")
-plot(2024:2123, pe[4, ,2], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 4")
-plot(2024:2123, pe[5, ,2], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 5")
-plot(2024:2123, pe[6, ,2], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 6")
-plot(2024:2123, pe[7, ,2], type="l", 
-     ylim=c(0,1),
-     ylab="Prob. of extinction", xlab="Year", main="Scenario 7")
+     ylab="Prob. of extinction", xlab="Year", main="")
+for (i in 2:36){
+  lines(yrs, pe[i, ,2], 
+        col=cols[ rep( rep(c(1,2,3,4), each=3), 3)[i] ], lty=rep(c(1,2,3), each=12)[i], lwd=2)
+}    
 
 
 par(mfrow=c(3,2))
