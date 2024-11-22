@@ -136,7 +136,7 @@ legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
 # countsAD <- t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
 #                        3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
 #                      nrow=2, byrow=TRUE))
-countsAD <- t(matrix(c(NA, NA, NA, NA, #72, 190, 235, 250, 
+countsAD <- t(matrix(c(72, 190, 235, 250, 
                        196, 210, 250, 268, 288, 268, 296, 276, 340,
                        3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
                      nrow=2, byrow=TRUE))
@@ -511,6 +511,8 @@ hsurv[hind,]
 #**********************
 p <- p2 <- 9
 
+effort.shift <- data.frame(LH=c(rep(1, 4), rep(0, 9)), 
+                                PC=rep(0, 13))
 #####################################
 # from IPMbook package
 dUnif <- function (lower, upper) 
@@ -574,18 +576,6 @@ s.end[3,1] <- s.end[4,1] <-
 s.end[1,2] <- s.end[2,2] <- s.end[5,2] <- s.endFY[2]
 s.end[3,2] <- s.end[4,2] <-
   s.end[6,2] <-s.end[7,2] <- s.endAD[2]
-# get mean abundance from preliminary run to 
-# include density dependence
-# load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-# library ('MCMCvis')
-# library ('coda')
-# out <- list(as.mcmc(post[[1]]), 
-#             as.mcmc(post[[2]]), 
-#             as.mcmc(post[[3]]),
-#             as.mcmc(post[[4]]))
-# outp <- MCMCpstr(out, type="chains")
-# ntot.post <- apply(outp$Ntot, c(2,3), mean)
-# ntot <- apply(ntot.post, 1, mean)
 
 #**********************
 #* 11. Data for analysis in NIMBLE----
@@ -626,7 +616,9 @@ constl <- list( # survival
                 s.end=s.end,
                 hacked = as.numeric(hacked.cov.survival)-1,
                 hacked.counts = as.matrix( hacked[,-1] ),
-                effort2 = data.frame(LH=effort$std2.LH, PC=effort$std2.PC, row.names=effort$Year)
+                effort2 = data.frame(LH=effort$std2.LH, PC=effort$std2.PC, row.names=effort$Year),
+                effort.shift = effort.shift,
+                mnC = apply(datl$countsAdults+datl$countsFY, 2, mean)
 )
 
 #*******************
@@ -713,13 +705,14 @@ inits.func1 <- function (){
   z = z.inits, 
   mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
-  deltas = runif(8, -0.1, 0.1),
+  deltas = runif(10, -0.1, 0.1),
+  alphas = array(runif(6*2, -0.1, 0.1), dim=c(6,2)),
   #sds = sds$mean,
   #Ustar = Ustar,
   sds2 = sds2$mean,
   Ustar2 = Ustar2,
   # counts
-  countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
+  #countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
   r = mean(outp$r),
   N = outp$N[1:7,1:13,1:2, 
               sample(seq(1, 4000, by=400), 1, replace = F)] # sample from inits of chains that worked

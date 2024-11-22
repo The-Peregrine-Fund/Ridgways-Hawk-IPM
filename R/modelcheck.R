@@ -436,7 +436,6 @@ MCMCtrace(post2, pdf=FALSE, params= "mus", Rhat=TRUE, priors=runif(20000, 0, 1),
 MCMCtrace(post2, pdf=FALSE, params= "betas", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
 MCMCtrace(post2, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
 MCMCtrace(post2, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "sds", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
 MCMCtrace(post2, pdf=FALSE, params= "sds2", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
 MCMCtrace(post2, pdf=FALSE, params= "R2")
 

@@ -48,9 +48,6 @@ knitr::read_chunk('R/03-ipm.R')
 ```
 
 ## 1.3 Population Viability Analysis  
-
-### 1.3.1 Increase Survival, Cease Management 
-
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/04-pva_survival.R')
 ```
@@ -81,6 +78,8 @@ knitr::read_chunk('R/05-postprocess.R')
 ```{r,pva, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
+```{r,pva2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+```
 
 ## 2.2 Plots of finer population segments and model diagnostics
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }

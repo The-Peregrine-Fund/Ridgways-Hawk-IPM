@@ -1,12 +1,14 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_longrun.rdata")
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
 library ('ggplot2')
 library('reshape2')
+library ('ggplot2')
+library ('tidybayes')
 out <- lapply(post, as.mcmc)
 # Identify chains with NAs that failed to initialize
 NAlist <- c()
@@ -26,6 +28,34 @@ out <- out[!NAlist]
 post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
 
+#######################
+lnt <- melt(outp$Ntot)
+colnames(lnt) <- c("Scenario", "Time", "Site2", "Iter", "Abund")
+lnt$Year <- lnt$Time + 2010
+lnt$Site <- factor(ifelse(lnt$Site2==1, 'Los Haitises', 'Punta Cana'))
+
+p1 <- ggplot(lnt, aes(x=Year, y=Abund, group=Scenario, 
+                        color = factor(Number.translocated), 
+                        linetype = factor(Number.of.nests.treated))) +
+  stat_pointinterval(aes(x = median_hdi, .width = c(.66, .95) +
+  facet_grid(rows=  vars(Site), cols= vars(Mortality.reduction), 
+             scales='free_y') +
+  #facet_wrap(~  Site + Mortality.reduction) +
+  scale_color_viridis_d(option="viridis", direction=1,
+                        name="Number translocated") +
+  scale_linetype(name="Number of nests treated") +
+  scale_x_continuous( name="Future year",
+                      breaks=c(2020, 2030, 2040, 2050, 2060, 2070),
+                      labels=c('', '2030', '', '2050', '', '2070'), 
+                      minor_breaks=NULL) +
+  theme_minimal() + 
+  ylab("Extinction probability")
+  
+  
+  
+
+
+
 #### ---- pltfunction -------
 # default settings for plots 
 plt  <- function(object, params,...) {
@@ -33,7 +63,6 @@ plt  <- function(object, params,...) {
            params=params, 
            guide_axis=TRUE, 
            HPD=TRUE, ci=c(80, 95), horiz=FALSE, 
-           #ylim=c(-10,10),
            ...)
   }
 
@@ -112,54 +141,55 @@ plt(object=out,
     xlab = "Year", ylab= "Prob. of extinction",
     ylim=c(0,1))
 
-##########################3
+##########################
+yrs2 <- c(2011:2023, yrs)
 par(mfrow=c(4,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[1, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[2, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[3, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[4, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[5, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[6, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
     params=paste0("Ntot[7, ",1:113, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2011:2123,
+    labels = yrs2,
     xlab = "Year", ylab= "Abundance")
 
 par(mfrow=c(4,2))

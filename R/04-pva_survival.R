@@ -16,26 +16,26 @@ load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
 #**********************
 constl$K <- 50 # number of future years
 cpus <- 10 # number of processors
-constl$SC <- 36 # number of PVA scenarios
+constl$SC <- 45 # number of PVA scenarios
 datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) ) # to help constrain FYs born + hacked to be positive
 constl$effort2 <- rbind(constl$effort2, array(0, dim=c(constl$K,2), dimnames=list(2024:(2024+constl$K-1), c("LH", "PC"))))
 
-constl$num.treated <- rep( c(0, 15, 30, 45, 0, 15, 30, 45, 0, 15, 30, 45), each=3 ) # 100s sub in for All but are over-ridden in model code
-num.hacked <- rep( c(0, 0, 0, 0, 5, 5, 5, 5, 10, 10, 10, 10), each=3 )
+constl$num.treated <- rep( c(0, 15, 30, 45, 100, 0, 15, 30, 45, 100, 0, 15, 30, 45, 100), each=3 ) # 100s sub in for All but are over-ridden in model code
+num.hacked <- rep( c(0, 0, 0, 0, 0, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10), each=3 )
 surv.diff <- array(NA, dim=c(constl$SC, 3, 2), dimnames=list(scenario=1:constl$SC, stage=c('FY', 'NB', 'B'), site=c('LH', 'PC')))
-surv.diff[,1,] <- matrix(c(rep( c(0, 0.130, 0.260), 12),
-                          rep( c(0, 0.146, 0.292), 12)), ncol=2)
-surv.diff[,2,] <- matrix(c(rep( c(0, 0.006, 0.012), 12),
-                           rep( c(0, 0.022, 0.044), 12)), ncol=2)
-surv.diff[,3,] <- matrix(c(rep( c(0, 0.016, 0.032), 12),
-                           rep( c(0, 0.026, 0.052), 12)), ncol=2)
+surv.diff[,1,] <- matrix(c(rep( c(0, 0.130, 0.260), 15),
+                          rep( c(0, 0.146, 0.292), 15)), ncol=2)
+surv.diff[,2,] <- matrix(c(rep( c(0, 0.006, 0.012), 15),
+                           rep( c(0, 0.022, 0.044), 15)), ncol=2)
+surv.diff[,3,] <- matrix(c(rep( c(0, 0.016, 0.032), 15),
+                           rep( c(0, 0.026, 0.052), 15)), ncol=2)
 constl$surv.diff <- surv.diff 
 
 hacked.counts <- array(0, dim=c(constl$SC, constl$nyr+constl$K, 2))
 for (sc in 1:constl$SC){
   hacked.counts[sc,1:constl$nyr, 1:2] <- constl$hacked.counts[, 1:2] 
   hacked.counts[sc,14:(constl$nyr+constl$K), 1] <- -num.hacked[sc]
-  hacked.counts[sc,14:(constl$nyr+constl$K), 2] <- 0
+  hacked.counts[sc,14:(constl$nyr+constl$K), 2] <-  num.hacked[sc]
 }
 constl$hacked.counts <- hacked.counts
 
@@ -332,7 +332,11 @@ mycode <- nimbleCode(
       for (t in (nyr+1):(nyr+K)){
         for (s in 1:nsite){
           # constrain N1+hacked.counts to be >=0, and allow it to shrink as the population shrinks
-          NFY[sc, t, s] <- step( (N[sc, 1, t, s] + hacked.counts[sc, t, s]) ) * (N[sc, 1, t, s] + hacked.counts[sc, t, s])  
+          # If LH has fewer birds than translocations, none are translocated
+          num.hacked[sc, t, s] <- step( N[sc, 1, t, 1] + hacked.counts[sc, t, 1] ) * hacked.counts[sc, t, s]  +
+                                (1- step( N[sc, 1, t, 1] + hacked.counts[sc, t, 1] )) * N[sc, 1, t, 1] * 
+                                (-1*equals(s,1) + equals(s,2))
+          NFY[sc, t, s] <- N[sc, 1, t, s] + num.hacked[sc, t, s]
           NF[sc, t, s] <- sum(N[sc, 2:4, t, s]) # number of adult nonbreeder females
           NB[sc, t, s] <- sum(N[sc, 5:7, t, s]) # number of adult breeder females
           NAD[sc, t, s] <- NF[sc, t, s] + NB[sc, t, s] # number of adults
@@ -406,35 +410,43 @@ mycode <- nimbleCode(
     }#i
     
     # Future projections of survival, recruitment, and detection
-    cap <- 0.97
+    cap <- 0.98 # cap on maximum survival
     for(sc in 1:SC){ 
       for (t in nyr:(nyr+K)){
+        # FYs we just calculate the percent for each year. 
+        perc.hacked[sc, t] <- num.hacked[sc, t, 2] / NFY[sc, t, 2]
+        # For adults we average over the previous 5 years as an approximation
+        perc.hacked.5yr[sc, t] <- sum( num.hacked[sc, (t-6):(t-1), 2] ) / sum(NFY[sc, (t-6):(t-1), 2])
+        
         for (s in 1:nsite){
-        #Survival
+        # enforce the survival cap
+        mn.phiFY[sc, t, s] <- step(cap - mn.phiFY1[sc, t, s]) * mn.phiFY1[sc, t, s] + 
+          (1 - step(cap - mn.phiFY1[sc, t, s])) * cap
+        mn.phiA[sc, t, s] <- step(cap - mn.phiA1[sc, t, s]) * mn.phiA1[sc, t, s] + 
+          (1 - step(cap - mn.phiA1[sc, t, s])) * cap
+        mn.phiB[sc, t, s] <- step(cap - mn.phiB1[sc, t, s]) * mn.phiB1[sc, t, s] + 
+          (1 - step(cap - mn.phiB1[sc, t, s])) * cap  
+          
+        # Survival
         mn.phiFY1[sc, t, s] <- ilogit( eta[1, s, t] + 
-          lmus[1, s] ) + surv.diff[sc, 1, s]  
+          lmus[1, s] + betas[1]*perc.hacked[sc, t]*equals(s,2) ) + 
+          surv.diff[sc, 1, s]  
         mn.phiA1[sc, t, s] <- ilogit( eta[2, s, t] + 
           lmus[2, s] ) + surv.diff[sc, 2, s]
         mn.phiB1[sc, t, s] <- ilogit( eta[3, s, t] +  
-          lmus[3, s] ) + surv.diff[sc, 3, s]
-        # enforce the cap
-        mn.phiFY[sc, t, s] <- step(cap - mn.phiFY1[sc, t, s]) * mn.phiFY1[sc, t, s] + 
-                              (1 - step(cap - mn.phiFY1[sc, t, s])) * cap
-        mn.phiA[sc, t, s] <- step(cap - mn.phiA1[sc, t, s]) * mn.phiA1[sc, t, s] + 
-                              (1 - step(cap - mn.phiA1[sc, t, s])) * cap
-        mn.phiB[sc, t, s] <- step(cap - mn.phiB1[sc, t, s]) * mn.phiB1[sc, t, s] + 
-                              (1 - step(cap - mn.phiB1[sc, t, s])) * cap   
-  
+          lmus[3, s] + betas[3]*perc.hacked.5yr[sc, t]*equals(s,2) ) + 
+          surv.diff[sc, 3, s]
+ 
         #Recruitment
         logit( mn.psiFYB[sc, t, s] ) <- eta[4, s, t] +  
-          lmus[4, s]   # first year to breeder
+          lmus[4, s]    # first year to breeder
         logit( mn.psiAB[sc, t, s] ) <- eta[5, s, t] +  
-          lmus[5, s] # nonbreeder to breeder
+          lmus[5, s]  + betas[5]*perc.hacked.5yr[sc, t]*equals(s,2) # nonbreeder to breeder
         logit( mn.psiBA[sc, t, s] ) <- 
           lmus[6, s]  # breeder to nonbreeder
         #Re-encounter
         logit( mn.pA[sc, t, s] ) <- eta[7, s, t] + 
-          lmus[7, s]  # resight of nonbreeders
+          lmus[7, s] + betas[7]*perc.hacked.5yr[sc, t]*equals(s,2) # resight of nonbreeders
         logit( mn.pB[sc, t, s] ) <- eta[8, s, t] +  
           lmus[8, s]  # resight of breeders
         } # s

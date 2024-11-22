@@ -7,6 +7,7 @@ library ("tidybayes")
 library ('bayestestR')
 library ("ggpubr")
 library("viridis")
+library ("HDInterval")
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 load("data/data.rdata")
 out <- lapply(post, as.mcmc) 
@@ -15,18 +16,18 @@ outp <- MCMCpstr(out, type="chains")
 #********************
 #* Calculate summary stats
 #********************
-#* Both sites
+#* Abundance at both sites
 Nall <- apply(outp$Ntot, c(1,3) , sum)
 l.all.post <- array(NA, dim=c(constl$nyr-1, ncol(Nall)) ) 
 for (t in 2:13){
 l.all.post[t-1, ]  <- Nall[t,] / Nall[t-1,]
 }
 l.mn <- apply(l.all.post, 2, mean)
-# Average annual changes
+# Average annual pop growth
 median(l.mn)
 HDInterval::hdi(l.mn)
 
-# Change from 2011 to 2023
+# 2011 to 2023 pop growth, growth between years
 l.all.post2  <- Nall[13,] / Nall[1,]
 median(l.all.post2)
 HDInterval::hdi(l.all.post2)
@@ -38,8 +39,9 @@ mn.lambda <- apply(outp$lambda, c(2,3), mean)
 
 # Overall averages
 mn.mus <- apply(outp$mus, c(1,3), mean)
-(md.mus <- apply(mn.mus, 1, median))
-(hdi.mus <- apply(mn.mus, 1, HDInterval::hdi))
+(md.mus <- apply(mn.mus, 1, median)) |> round(2)
+(hdi.mus <- apply(mn.mus, 1, HDInterval::hdi)) |> round(2)
+
 # Compare between sites
 df.sites <- data.frame(mus=1:8, pd=rep(NA,8), greater=NA)
 for (i in 1:8){
@@ -57,6 +59,31 @@ df.sites
 
 (md.mus <- apply(outp$mus, c(1,2), median)) |> round(2)
 (hdi.mus <- apply(outp$mus, c(1,2), HDInterval::hdi)) |> round(2)
+# productivity
+(outp$lmu.prod[1,]-outp$lmu.prod[2,]) |> pd()
+
+# Compare survival, recruitment, and detection rates
+# among life stages within each site
+df.comp <- data.frame(param1 = c('phiA', 'phiA', 'phiB', 'psiA', 'pB'), 
+                 param2 = c('phiB', 'phiFY', 'phiFY', 'psiFY', 'pA'), 
+                 pd_LH = NA, pd_PC = NA)
+## Los Haitises, survival
+df.comp$pd_LH[1] <- (outp$lmus[2,1,]-outp$lmus[3,1,]) |> pd() |> round(2)
+df.comp$pd_LH[2] <- (outp$lmus[2,1,]-outp$lmus[1,1,]) |> pd() |> round(2)
+df.comp$pd_LH[3] <- (outp$lmus[3,1,]-outp$lmus[1,1,]) |> pd() |> round(2)
+## Los Haitises, recruitment rates
+df.comp$pd_LH[4] <- (outp$lmus[5,1,]-outp$lmus[4,1,]) |> pd() |> round(2)
+## Los Haitises, resight probability
+df.comp$pd_LH[5] <- (outp$lmus[8,1,]-outp$lmus[7,1,]) |> pd() |> round(2)
+## Punta Canas, survival
+df.comp$pd_PC[1] <- (outp$lmus[2,2,]-outp$lmus[3,2,]) |> pd() |> round(2)
+df.comp$pd_PC[2] <- (outp$lmus[2,2,]-outp$lmus[1,2,]) |> pd() |> round(2)
+df.comp$pd_PC[3] <- (outp$lmus[3,2,]-outp$lmus[1,2,]) |> pd() |> round(2)
+## Punta Cana, recruitment rates
+df.comp$pd_PC[4] <- (outp$lmus[5,2,]-outp$lmus[4,2,]) |> pd() |> round(2)
+## Punta Cana, resight probability
+df.comp$pd_PC[5] <- (outp$lmus[8,2,]-outp$lmus[7,2,]) |> pd() |> round(2)
+df.comp 
 
 #*******************
 #* Plot IPM results
@@ -242,30 +269,21 @@ p6
 #        device="tiff",
 #        width=8, height=4, dpi=300)
 
-
+# print estimates
+mds <- tapply(lmus$value, list(lmus$Parameter, lmus$Site), median) |> round(2)
+hdi_LH <- tapply(lmus$value, list(lmus$Parameter, lmus$Site), HDInterval::hdi)[,1]
+hdi_LH2 <- do.call(rbind, hdi_LH) |> round(2)                                                                  
+hdi_PC <- tapply(lmus$value, list(lmus$Parameter, lmus$Site), HDInterval::hdi)[,2]
+hdi_PC2 <- do.call(rbind, hdi_PC) |> round(2) 
+df <- data.frame(param= c("phiFY", "phiA", "phiB", "psiFY:B", "psiA:B", "psiB:A", "pA", "pB"),
+  md_LH=mds[,1], lhdi_LH=hdi_LH2[,1], uhdi_LH=hdi_LH2[,2], 
+  md_PC=mds[,2], lhdi_PC=hdi_PC2[,1], uhdi_PC=hdi_PC2[,2])
+df
 # Plot predicted survival, recruitment, and detection
 # with effects from translocation and hacking
 # Birds were only hacked from LHNP to PC here
 # so we only predict values for PC
-# pred.mus <- array(NA, dim=dim(outp$mus))
-# for (m in 1:8){
-#   for (tr in 1:2){
-#     pred.mus[m,tr,] <- plogis( outp$lmus[m,2,] + outp$betas[m,]*c(0,1)[tr] ) 
-#   }}
-# 
-# dimnames(pred.mus) <- list(param=c("FY", "A", "B", "FY:B", "A:B", "B:A", "A", "B"),
-#                            trans=c("Not translocated", "Translocated"), 
-#                            iter=1:10000)
-# lm <- melt(pred.mus)
-# 
-# p5 <- ggplot(data= lm, aes(x=value, y=param )) +
-#   stat_halfeye(point_interval=median_hdi, .width = c(.95, .80)) +
-#   coord_flip() +
-#   facet_wrap("trans") +
-#   xlab("Probability") + ylab("Parameter") +
-#   theme_bw(base_size=14) +
-#   theme(panel.grid.major.x = element_blank(),
-#         panel.grid.minor.x = element_blank()) 
+
 betas.pd <- apply(outp$betas, 1, pd)
 ind <- which (betas.pd>0.975) # which are significant
 pred.mus <- array(NA, dim=c(dim(outp$mus)))
@@ -333,8 +351,8 @@ f2.md <- apply(f.pred, 1, median)
 f2.HDI80 <- apply(f.pred, 1, HDInterval::hdi, credMass=0.8)
 f2.HDI95 <- apply(f.pred, 1, HDInterval::hdi)
 
-tiff(height=4, width=6, units="in", res=300,
-     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Fecundity_treatment.tiff")
+# tiff(height=4, width=6, units="in", res=300,
+#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Fecundity_treatment.tiff")
 par(mar=c(3,5,3,1), mfrow=c(1,1))
 plot(c(1, 2)-0.1, f.md, 
      ylim=c(0, 1.55),
@@ -367,7 +385,7 @@ lines(c(2,2) +0.1, f2.HDI80[,2], lwd=6)
 legend(x=1.5,y=1.9, pch=c(16,18), pt.cex=c(1.5,2.5), cex=1,
        legend=c("Untreated", "Treated" ), 
        horiz=TRUE, xjust=0.5, xpd=NA)
-dev.off()
+#dev.off()
 
 # Calculate probability of direction
 f.diff <- f[1,]-f[2,]
@@ -417,10 +435,10 @@ segments(x0=2012:2023, x1=2012:2023,
 
 # create a function to plot correlations
 # between demographics and population growth rates
-plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, site=1, yaxt="b"){
+plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, ind.y=1:12, site=1, yaxt="b"){
   # calculate the correlation coefficient 
   # over each iteration to propagate error
-  lambda <- lam.post[1:12, site,]
+  lambda <- lam.post[ind.y, site,]
   x <- x.post[ind.x, site, ]
   df <- data.frame(ats1=c(0.8, 0.9, 1.0, 1.1, 1.2, 1.3),
                    ats2=c(1.0, 1.5, 2.0, 2.5, 3.0, 3.5),
@@ -448,7 +466,7 @@ plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, site=1, yaxt="b"){
     x.lims <- c(min(x.hdi[,]), max(x.hdi[,]))
     y.lims <- c(min(lam.hdi[,]), max(lam.hdi[,]))
     if(yaxt=="n"){
-    plot(x.m, lam.m[1:12], 
+    plot(x.m, lam.m[ind.y], 
          xlim= x.lims,
          ylim= y.lims,
          type="n", 
@@ -457,7 +475,7 @@ plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, site=1, yaxt="b"){
          yaxt=yaxt, xaxt="n")
       axis(2, at=df[,1], labels=c(rep(NA, 5)))
     } else {
-      plot(x.m, lam.m[1:12], 
+      plot(x.m, lam.m[ind.y], 
            xlim= x.lims,
            ylim= y.lims,
            type="n", 
@@ -513,154 +531,199 @@ plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n", site=
 plot.cor(outp$lambda, outp$mn.phiB, x.lab="Breeder Survival", site=2)
 plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", site=2)
 plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n", site=2)
-mtext("Population growth rate", side=2, outer=TRUE, line=2.5, cex=2)
+mtext("Abundance", side=2, outer=TRUE, line=2.5, cex=2)
 mtext("Punta Cana", side=3, outer=TRUE, cex=2)
 #dev.off()
+
+# Is there evidence of density dependence
+par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
+plot.cor(outp$Ntot, outp$mn.prod, x.lab="Fecundity", ind.x=2:13)
+plot.cor(outp$Ntot, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n")
+plot.cor(outp$Ntot, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n")
+plot.cor(outp$Ntot, outp$mn.phiB, x.lab="Breeder Survival")
+plot.cor(outp$Ntot, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n")
+plot.cor(outp$Ntot, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n")
+mtext("Abundance", side=2, outer=TRUE, line=2.5, cex=2)
+mtext("Los Haitises", side=3, outer=TRUE, cex=2)
+#dev.off()
+
+# tiff(height=4, width=8, units="in", res=300,
+#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics2.tiff")
+par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
+plot.cor(outp$Ntot, outp$mn.prod, x.lab="Fecundity", ind.x=2:13, site=2)
+plot.cor(outp$Ntot, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n", site=2)
+plot.cor(outp$Ntot, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n", site=2)
+plot.cor(outp$Ntot, outp$mn.phiB, x.lab="Breeder Survival", site=2)
+plot.cor(outp$Ntot, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", site=2)
+plot.cor(outp$Ntot, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n", site=2)
+mtext("Population growth rate", side=2, outer=TRUE, line=2.5, cex=2)
+mtext("Punta Cana", side=3, outer=TRUE, cex=2)
+#dev
 
 #### ---- pva -----
 #*******************
 #* Plot PVA results
 #*******************
 library ('viridis')
+library ("tidybayes")
 library ('coda')
 library ('MCMCvis')
-# Abundance of females at Los Haitises
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_survival_longrun2.rdata")
+library ('reshape2')
+library('ggplot2')
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_longrun.rdata")
 out <- lapply(post, as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
-
-cols <- rev(magma(8))
-pe <- apply(outp$extinct, c(1,2,3), mean)
-
-tiff(height=3, width=8, units="in", res=300,
-     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Quasiextinction.tiff")
-par(mar=c(2, 2, 1, 1), oma=c(3,3,0,0))
-layout(matrix(c(1,1,2,2,3), 1, 5, byrow = TRUE))
-
-plot(2024:2123, pe[1, ,1], 
-     type="n", col=cols[1], lwd=2,
-     ylim=c(0,1), main="Los Haitises",
-     ylab="Quasi-extinction probability", xlab="Year",
-     xaxt="n")
-axis(1, at=seq(2020, 2120, by=10), 
-     labels=c(2020, NA, 2040, NA, 2060, NA, 2080, NA, 2100, NA, 2120))
-abline(h=seq(0, 1, by=0.1), col="gray90")
-abline(v=seq(2030, 2130, by=10), col="gray90")
-lines(2024:2123, pe[1, ,1], col=cols[1], lwd=2)
-lines(2024:2123, pe[2, ,1], col=cols[2], lwd=2)
-lines(2024:2123, pe[3, ,1], col=cols[3], lwd=2)
-lines(2024:2123, pe[4, ,1], col=cols[4], lwd=2)
-lines(2024:2123, pe[5, ,1], col=cols[5], lwd=2)
-lines(2024:2123, pe[6, ,1], col=cols[6], lwd=2)
-lines(2024:2123, pe[7, ,1], col=cols[7], lwd=2)
-lines(2024:2123, pe[8, ,1], col=cols[8], lwd=2)
-
-plot(2024:2123, pe[1, ,2], 
-     type="n", col=cols[1], lwd=2,
-     ylim=c(0,1), main="Punta Cana",
-     ylab="", xlab="Year",
-     xaxt="n")
-axis(1, at=seq(2020, 2120, by=10), 
-     labels=c(2020, NA, 2040, NA, 2060, NA, 2080, NA, 2100, NA, 2120))
-abline(h=seq(0, 1, by=0.1), col="gray90")
-abline(v=seq(2030, 2130, by=10), col="gray90")
-lines(2024:2123, pe[1, ,2], col=cols[1], lwd=2)
-lines(2024:2123, pe[2, ,2], col=cols[2], lwd=2)
-lines(2024:2123, pe[3, ,2], col=cols[3], lwd=2)
-lines(2024:2123, pe[4, ,2], col=cols[4], lwd=2)
-lines(2024:2123, pe[5, ,2], col=cols[5], lwd=2)
-lines(2024:2123, pe[6, ,2], col=cols[6], lwd=2)
-lines(2024:2123, pe[7, ,2], col=cols[7], lwd=2)
-lines(2024:2123, pe[8, ,2], col=cols[8], lwd=2)
-plot.new()
-legend(x=-0.3, y=0.5, title="Survival increase",
-       legend=c("0", "0.01", "0.02",
-                "0.03", "0.04", "0.05", 
-                "0.10", "0.15"),
-       xpd=NA, col=cols, lty=1, lwd=2,
-       xjust=0, yjust=0.5)
-mtext("Future year", 1,  outer=TRUE, line=1, adj=0.39)
-mtext("Quasi-extinction probability", 2, outer=TRUE, line=1)
-dev.off()
-
-# 3D figure of quasi-extinction rates after 50 years. 
-df.pva <- read.csv("data//pva_scenarios.csv", header=TRUE)
-df.pva <- data.frame(scenario = 1:36,
-                     transl = rep(c(0,5,10), each=12), 
-                     treat= rep( rep(c(0, 15, 30, 45), each=3), 3),
-                     mort = rep(c(100, 80, 60), 12) )
-
-df100 <- df.pva[df.pva$mort=="100", ]
-qe100_LH <- array(0.5, dim = apply(df.pva, 2, function(x) length(unique(x)) )[-1], 
-            dimnames = apply(df.pva, 2, unique)[-1])
-qe100_PC <- array(0.5, dim = apply(df.pva, 2, function(x) length(unique(x)) )[-1], 
-                  dimnames = apply(df.pva, 2, unique)[-1] )
-
-for (i in 1:nrow(df100)){
-                          transl2 <- as.character( df100$transl[i] )
-                          treat2 <- as.character( df100$treat[i] )
-                          qe100_LH[transl2, treat2, 1] <- mean( outp$extinct[ df100$scenario[i], 50, 1] )
-                          qe100_PC[transl2, treat2, 1] <- mean( outp$extinct[ df100$scenario[i], 50, 2] )
-}
-
-tiff(height=3, width=8, units="in", res=300,
-     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Quasiextinction_3d.tiff")
-par(mrfrow=c(3,2))
-
-persp(x=as.numeric(rownames(qe100_LH)), 
-      y = as.numeric(colnames(qe100_LH)), 
-      z = qe100_LH[,,1], zlim=c(0,1), 
-      col = scale_color_continuous( viridis) )
-
-#* ggplot version
-lpe <- melt(pe)
-colnames(lpe) <- c('Scenarios', 'Time', 'Site2', 'Extinct')
 scen <- data.frame('Scenarios' = 1:36,
                    'Number translocated' = rep(c(0,5,10), each=12), 
                    'Number of nests treated' = rep( rep(c(0, 15, 30, 45), each=3), 3),
-                   'Mortality reduction' = rep(c('Mortality=100%', 'Mortality=80%', 'Mortality=60%'), 12) )
+                   'Mortality reduction' = rep(c('100% Mortality', '80% Mortality', '60% Mortality'), 12) )
+
+#*********************
+#* Line plot of extinction probability over time
+#*********************
+pe <- apply(outp$extinct, c(1,2,3), mean)
+lpe <- melt(pe)
+colnames(lpe) <- c('Scenarios', 'Time', 'Site2', 'Extinct')
 pe.df <- merge(lpe, scen, by='Scenarios', all.x=TRUE)
 pe.df$Year <- pe.df$Time+2023
 pe.df$Site <- ifelse(pe.df$Site2==1, "Los Haitises", "Punta Cana")
-#pe.df <- pe.df[!(pe.df$Site2==2 & pe.df$Number.translocated>0),]
 pe.df[(pe.df$Site2==2 & pe.df$Number.translocated>0),]$Extinct <- NA
+pe.df$Mortality.reduction <- factor(pe.df$Mortality.reduction, 
+                                    levels= c('100% Mortality', '80% Mortality', '60% Mortality'))
 
-ggplot(pe.df, aes(x=Year, y=Extinct, group=Scenarios, 
+p6 <- ggplot(pe.df, aes(x=Year, y=Extinct, group=Scenarios, 
                   color = factor(Number.translocated), 
                   linetype = factor(Number.of.nests.treated))) +
   geom_line( linewidth = 1) +
-  facet_grid(rows=  vars(Site), cols= vars(Mortality.reduction),
+  facet_grid(rows=  vars(Site), cols= vars(Mortality.reduction), 
              scales='free_y') +
   #facet_wrap(~  Site + Mortality.reduction) +
   scale_color_viridis_d(option="viridis", direction=1,
                         name="Number translocated") +
   scale_linetype(name="Number of nests treated") +
-  theme_minimal() + theme(strip.background = element_rect(size = 0.5)) +
-  ylab("Quasi-extinction probability")
+  scale_x_continuous( name="Future year",
+                      breaks=c(2020, 2030, 2040, 2050, 2060, 2070),
+                     labels=c('', '2030', '', '2050', '', '2070'), 
+                     minor_breaks=NULL) +
+  theme_minimal() + 
+  ylab("Extinction probability")
+p6
+# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_lines.tiff",
+#        plot=p6,
+#        device="tiff",
+#        width=6, height=4, dpi=300)
 
+#********************
+#* PVA heatmap of extinction probability projected 50 years
+#********************
 pe.df2 <- pe.df[pe.df$Time==50, ]
+
 p7 <- ggplot(pe.df2, aes(x = as.factor(Number.translocated), 
-                  y = as.factor(Number.of.nests.treated),  
-                  fill = Extinct)) +
-  geom_tile( ) + 
+                  y = as.factor(Number.of.nests.treated))) +
+  geom_tile( aes(fill = Extinct ) ) + 
+  geom_text(aes(label=round(Extinct,2)), color="gray70") +
   scale_fill_viridis_c(option="plasma", direction=1,
-                       name = "Quasi-extinction\nprobability after\n50 years") +
+                       name = "Extinction\nprobability after\n50 years") +
   facet_wrap(~  Site + factor(Mortality.reduction, 
-                              levels=c("Mortality=100%", "Mortality=80%", "Mortality=60%"))) +
+                              levels=c("100% Mortality", "80% Mortality", "60% Mortality"))) +
   scale_y_discrete(breaks=c(0,15,30,45), 
                    name="Number of nests treated") +
   scale_x_discrete(name="Number translocated") +
   theme_minimal( ) + theme(strip.background = element_rect(size = 0.5))
+p7  
+# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_50yrHeatmap.tiff",
+#        plot=p7,
+#        device="tiff",
+#        width=6, height=4, dpi=300)
+pe.df3 <- pe.df2[!is.na(pe.df2$Extinct),]
+pe.df3 <- pe.df3[rev(order(pe.df3$Site2, pe.df3$Extinct)),]
+pe.df3
+
+#***************************
+# Plot total Abundance
+lnt1 <-  outp$Ntot[,1:13, , ] |> melt()
+colnames(lnt1) <- c("Scenarios", "Time", "Site2", "Iter", "Abund")
+lnt1$Year <- lnt1$Time + 2010
+lnt1$Site <- factor(ifelse(lnt1$Site2==1, 'Los Haitises', 'Punta Cana'))
+nt.df <- merge(lnt1, scen, by='Scenarios', all.x=TRUE)
+nt.df$Mortality.reduction <- factor(nt.df$Mortality.reduction,
+                                    levels=c('100% Mortality','80% Mortality', '60% Mortality' ))
+nt.df[(nt.df$Site2==2 & nt.df$Number.translocated>0),]$Abund <- NA
+nt.df <- nt.df[nt.df$Scenarios %in% c(1,2,3), ]
+
+# calculate future means
+lnt2 <- apply(outp$Ntot[,13:63, , ], c(1, 2, 3), median) |> melt()
+colnames(lnt2) <- c("Scenarios", "Time", "Site2", "Abund")
+lnt2$Year <- lnt2$Time + 2022
+lnt2$Site <- factor(ifelse(lnt2$Site2==1, 'Los Haitises', 'Punta Cana'))
+nt.df2 <- merge(lnt2, scen, by='Scenarios', all.x=TRUE)
+nt.df2$Mortality.reduction <- factor(nt.df2$Mortality.reduction,
+                                    levels=c('100% Mortality','80% Mortality', '60% Mortality' ))
+nt.df2[(nt.df2$Site2==2 & nt.df2$Number.translocated>0),]$Abund <- NA
+
+p8 <- ggplot() +
+      stat_lineribbon(data= nt.df,  
+                      aes(x=Year, y=Abund, group=Scenarios),
+                      fill='gray40',
+                      linewidth=0.5,
+                      point_interval = 'median_hdci', .width = 0.95,
+                       na.rm=TRUE) +
+      geom_line(data= nt.df2,
+                aes(x=Year, y=Abund, group=Scenarios,
+                    color = factor(Number.translocated),
+                    linetype = factor(Number.of.nests.treated) ),
+                linewidth=0.5) +
+      facet_grid(rows = vars(Site), cols = vars(Mortality.reduction),
+                 scales ='free_y') +
+      ylab('Number of females') +
+      scale_color_viridis_d(option="viridis", direction=1,
+                            name="Number translocated") +
+      scale_linetype(name="Number of nests treated") +
+      theme_minimal()
   
-ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Quasi-extinction_50yrHeatmap.tiff",
-       plot=p7,
-       device="tiff",
-       width=6, height=4, dpi=300)
+p8
+# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance_projections.tiff",
+#        plot=p9,
+#        device="tiff",
+#        width=8, height=4, dpi=300)
 
 # Time to extinction
 # conditional on extinction threshold (D=X)
-# D <- 3
-# qextinct <- outp$Ntot <=3
-# ext <- outp$extinct[,100,,]==1
-# t.extinction <- apply(qextinct[])
+#### ---- pva2 -----
+D <- 1
+abund <- outp$Ntot[,14:(13+50),,]
+dimnames(abund) <- list('Scenarios'=1:36, 
+                        'Time'= 2024:(2024+49), 
+                        'Site'=c("Los Haitises", "Punta Cana"), 
+                        'Iter'=1:10000)
+qextinct <- abund == D
+ext <- qextinct[,50,,] <= D
+lte <- melt( qextinct )
+colnames(lte)[5] <- "Extinct"
+le <- melt( ext )
+colnames(le)[4] <- "EverExtinct"
+lte2 <- merge(lte, le, by=c("Scenarios", "Site", "Iter")  )
+lte3<- lte2[lte2$EverExtinct==TRUE, ]
+lte4 <- lte3[lte3$Extinct==TRUE, ]
+lte5 <- tapply(lte4$Time-2023, list(lte4$Scenarios, lte4$Site, lte4$Iter), min)
+lte6 <- melt(lte5)
+lte7 <- lte6[!is.na(lte6$value), ]
+colnames(lte7) <- c('Scenarios', 'Site', 'Iter', 'TTE')
+te <- table(lte7$TTE, lte7$Scenarios, lte7$Site) |> melt()
+colnames(te) <- c('TE', 'Scen', 'Site', 'Count')
+te$Scenarios <- factor(paste0("Scenario ", te$Scen), 
+                       levels=paste0('Scenario ', 1:36)) 
+teLH <- te[te$Site=="Los Haitises",]
+tePC <- te[te$Site=="Punta Cana",]
+
+p9 <- ggplot() +
+      geom_col(data = teLH, aes(x= TE, y=Count)) + 
+      facet_wrap(vars(Scenarios),
+                 nrow=12, ncol=3, scales="free_y", shrink=FALSE)
+
+p10 <- ggplot() +
+  geom_col(data = tePC, aes(x= TE, y=Count)) + 
+  facet_wrap(vars(Scenarios),
+             nrow=12, ncol=3, scales="free_y", shrink=FALSE)
+p9
+p10
