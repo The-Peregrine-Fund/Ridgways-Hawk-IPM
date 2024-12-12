@@ -1,7 +1,7 @@
 #### ---- setup -------
 #load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_sites.rdata")
-#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_longrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun.rdata")
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -95,9 +95,9 @@ for (i in 2:36){
 par(mfrow=c(3,2))
 plt(object=out, 
     exact=TRUE, ISB=FALSE, 
-    params=paste0("extinct[1, ",1:100, ", 1]"), 
+    params=paste0("extinct[1, ",1:50, ", 1]"), 
     main="All stages\n Los Haitises", 
-    labels = 2024:2123,
+    labels = 2024:(2023+50),
     xlab = "Year", ylab= "Prob. of extinction",
     ylim=c(0,1))
 

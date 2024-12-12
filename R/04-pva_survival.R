@@ -82,8 +82,8 @@ inits.func.pva <- function (){
     mus = apply(outp$mus, c(1,2), mean), 
     betas = apply(outp$betas, 1, mean),
     deltas = apply(outp$deltas, 1, mean),
-    sds2 =  apply(outp$sds2, 1, mean),
-    Ustar2 = u2,
+    sds =  apply(outp$sds2, 1, mean),
+    Ustar = u2,
     # counts
     countsAdults= matrix(c(374, 335, 305, 295, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
     r = mean(outp$r),
@@ -149,8 +149,8 @@ mycode <- nimbleCode(
     ###################################################
     # survival, recruitment, and detection can be correlated
     for (k in 1:8){ 
-      betas[k] ~ dunif(-20, 20)  # prior for coefficients
-      deltas[k] ~ dunif(-20, 20)
+      betas[k] ~ dnorm(0, sd=10)  # prior for coefficients
+      deltas[k] ~ dnorm(0, sd=10)
     } # k
     
     for (j in 1:8){
@@ -159,17 +159,21 @@ mycode <- nimbleCode(
         mus[j,s] ~ dbeta(1,1) # prior for means
       }}     # m population #s sex #h hacked
     
-    # Temporal and site random effects using the multivariate normal distribution
-    for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal and site variation
-    R2[1:p2,1:p2] <- t(Ustar2[1:p2,1:p2]) %*% Ustar2[1:p2,1:p2] # calculate rhos, correlation coefficients
-    Ustar2[1:p2,1:p2] ~ dlkj_corr_cholesky(eta=1.1, p=p2) # Ustar is the Cholesky decomposition of the correlation matrix
-    U2[1:p2,1:p2] <- uppertri_mult_diag(Ustar2[1:p2, 1:p2], sds2[1:p2]) # custom function taken from nimble listserv (specified below)
+    # Temporal random effects and correlations between sites
+    # Non-centered parameterization of the multivariate normal distribution to improve convergence
+    for (jj in 1:p){ sds[jj] ~ dexp(1) }# prior for temporal variation
+    # estimated using the multivariate normal distribution
+    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
+    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
     # multivariate normal for temporal variance
-    for (t in 1:(nyr+K) ){ 
+    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
       for (s in 1:nsite){
-        eta[1:p2,s,t] ~ dmnorm(mu.zeroes2[1:p2],
-                               cholesky = U2[1:p2, 1:p2], prec_param = 0)
+        eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
+        for(j in 1:p){
+          z.score[j,s,t] ~ dnorm(0, sd=1)  # z-scores
+        } # j
       } } # s t 
+    
     #######################
     # Derived params
     #######################
@@ -196,7 +200,7 @@ mycode <- nimbleCode(
     for (s in 1:nsite){
       lmu.prod[s] ~ dnorm(0, sd=5)
     } # s
-    gamma ~ dunif(-20, 20)
+    gamma ~ dnorm(0, sd=10)
     rr ~ dexp(0.05)
     
     # Productivity likelihood       
@@ -224,13 +228,20 @@ mycode <- nimbleCode(
       for(sc in 1:SC){
         for (t in (nyr+1):(nyr+K) ){
           for (s in 1:nsite){
-            perc.treat[sc, t, s] <-  # 
-              step( NB[sc, t, s]-num.treated[sc] ) * (num.treated[sc] + 0.001)/(NB[sc, t, s]+0.001)  + # num.treated > NB, calculate proportion
-              1-step( NB[sc, t, s]-num.treated[sc] )   #  num.treated < NB set to 1
-            
+            numer.perc.treat[sc, t, s] <-  # numerator
+                                     step( NB[sc, t, s]-(num.treated[sc]+1) ) * num.treated[sc]  + # num.treated > NB, use num.treated
+                                    ( 1-step( NB[sc, t, s]-(num.treated[sc]+1) )) * NB[sc, t, s]   #  num.treated < NB set to NB
+            denom.perc.treat[sc, t, s] <- # denominator, total nests available for treatment
+                                    step( NB[sc, t, s]-(num.treated[sc]+1) ) * NB[sc, t, s]  + # num.treated > NB, use num.treated
+                                    ( 1-step( NB[sc, t, s]-(num.treated[sc]+1) )) * numer.perc.treat[sc, t, s]
+            denom.perc.treat2[sc, t, s] <- equals(denom.perc.treat[sc, t, s], 0) +
+                                          (1- equals(denom.perc.treat[sc, t, s], 0)) *denom.perc.treat[sc, t, s]
+            perc.treat[sc, t, s] <- numer.perc.treat[sc, t, s] /
+                                    denom.perc.treat2[sc, t, s] 
+
         log(mn.prod[sc, t, s]) <- lmu.prod[s] + 
-          gamma*perc.treat[sc, t, s] + # treat.pair set to one here.
-                              eta[9, s, t] 
+                                  gamma*perc.treat[sc, t, s] + # treat.pair set to one here.
+                                  eta[9, s, t] 
   }} } # s t sc
     
     ################################
@@ -299,6 +310,9 @@ mycode <- nimbleCode(
     # Count likelihoods, state-space model, and observation process 
     for (t in 1:nyr){
       for (s in 1:nsite){
+        num.hacked[1, t, s] <- step( N[1, 1, t, 1] + hacked.counts[1, t, 1] ) * hacked.counts[1, t, s]  +
+          (1- step( N[1, 1, t, 1] + hacked.counts[1, t, 1] )) * N[1, 1, t, 1] * 
+          (-1*equals(s,1) + equals(s,2)) # change to 
         constraint_data[t, s] ~ dconstraint( (N[1, 1, t, s] + hacked.counts[1, t, s]) >= 0 ) # Transfers translocated first-year females
         NFY[1, t, s] <- N[1, 1, t, s] + hacked.counts[1, t, s] # Transfers translocated first-year females
         NF[1, t, s] <- sum(N[1, 2:4, t, s]) # number of adult nonbreeder females
@@ -317,6 +331,7 @@ mycode <- nimbleCode(
           NB[sc, t, s] <- NB[1, t, s]
           NAD[sc, t, s] <- NAD[1, t, s]
           Ntot[sc, t, s] <- Ntot[1, t, s]
+          num.hacked[sc, t, s] <- num.hacked[1, t, s]
         } # sc
       }# s
       # First-years at different sites have different distributions
@@ -335,7 +350,7 @@ mycode <- nimbleCode(
           # If LH has fewer birds than translocations, none are translocated
           num.hacked[sc, t, s] <- step( N[sc, 1, t, 1] + hacked.counts[sc, t, 1] ) * hacked.counts[sc, t, s]  +
                                 (1- step( N[sc, 1, t, 1] + hacked.counts[sc, t, 1] )) * N[sc, 1, t, 1] * 
-                                (-1*equals(s,1) + equals(s,2))
+                                (-1*equals(s,1) + equals(s,2)) # change to negative value for LH when using
           NFY[sc, t, s] <- N[sc, 1, t, s] + num.hacked[sc, t, s]
           NF[sc, t, s] <- sum(N[sc, 2:4, t, s]) # number of adult nonbreeder females
           NB[sc, t, s] <- sum(N[sc, 5:7, t, s]) # number of adult breeder females
@@ -410,43 +425,49 @@ mycode <- nimbleCode(
     }#i
     
     # Future projections of survival, recruitment, and detection
+    for(sc in 1:SC){ 
+      for (t in 7:(nyr+K)){
+        for (s in 1:nsite){    
+    # FYs we calculate the percent hacked for each year. 
+    perc.hacked[sc, t, s] <- ( num.hacked[sc, t, s] / (NFY[sc, t, s]+0.0001) ) *
+      equals(s,2) # set LH to zero
+    # For adults we average over the previous 5 years as an approximation
+    perc.hacked.5yr[sc, t, s] <- ( sum( num.hacked[sc, (t-6):(t-1), s] ) / 
+                                     (sum( NFY[sc, (t-6):(t-1), s] )+0.0001) )*
+      equals(s,2) # set LH to zero 
+        }}}
+    
     cap <- 0.98 # cap on maximum survival
     for(sc in 1:SC){ 
       for (t in nyr:(nyr+K)){
-        # FYs we just calculate the percent for each year. 
-        perc.hacked[sc, t] <- num.hacked[sc, t, 2] / NFY[sc, t, 2]
-        # For adults we average over the previous 5 years as an approximation
-        perc.hacked.5yr[sc, t] <- sum( num.hacked[sc, (t-6):(t-1), 2] ) / sum(NFY[sc, (t-6):(t-1), 2])
-        
         for (s in 1:nsite){
         # enforce the survival cap
         mn.phiFY[sc, t, s] <- step(cap - mn.phiFY1[sc, t, s]) * mn.phiFY1[sc, t, s] + 
-          (1 - step(cap - mn.phiFY1[sc, t, s])) * cap
+                              (1 - step(cap - mn.phiFY1[sc, t, s])) * cap
         mn.phiA[sc, t, s] <- step(cap - mn.phiA1[sc, t, s]) * mn.phiA1[sc, t, s] + 
-          (1 - step(cap - mn.phiA1[sc, t, s])) * cap
+                              (1 - step(cap - mn.phiA1[sc, t, s])) * cap
         mn.phiB[sc, t, s] <- step(cap - mn.phiB1[sc, t, s]) * mn.phiB1[sc, t, s] + 
-          (1 - step(cap - mn.phiB1[sc, t, s])) * cap  
-          
+                              (1 - step(cap - mn.phiB1[sc, t, s])) * cap  
         # Survival
         mn.phiFY1[sc, t, s] <- ilogit( eta[1, s, t] + 
-          lmus[1, s] + betas[1]*perc.hacked[sc, t]*equals(s,2) ) + 
+          lmus[1, s] + betas[1]*perc.hacked[sc, t, s] ) + # change perc.hacked to zero at LH bc no birds translocated there
           surv.diff[sc, 1, s]  
         mn.phiA1[sc, t, s] <- ilogit( eta[2, s, t] + 
           lmus[2, s] ) + surv.diff[sc, 2, s]
         mn.phiB1[sc, t, s] <- ilogit( eta[3, s, t] +  
-          lmus[3, s] + betas[3]*perc.hacked.5yr[sc, t]*equals(s,2) ) + 
+          lmus[3, s] + betas[3]*perc.hacked.5yr[sc, t, s] ) + # change perc.hacked to zero at LH bc no birds translocated there
           surv.diff[sc, 3, s]
  
         #Recruitment
         logit( mn.psiFYB[sc, t, s] ) <- eta[4, s, t] +  
           lmus[4, s]    # first year to breeder
-        logit( mn.psiAB[sc, t, s] ) <- eta[5, s, t] +  
-          lmus[5, s]  + betas[5]*perc.hacked.5yr[sc, t]*equals(s,2) # nonbreeder to breeder
+        logit( mn.psiAB[sc, t, s] ) <- eta[5, s, t] +  # nonbreeder to breeder
+          lmus[5, s] + betas[5]*perc.hacked.5yr[sc, t, s] # change perc.hacked to zero at LH bc no birds translocated there
         logit( mn.psiBA[sc, t, s] ) <- 
           lmus[6, s]  # breeder to nonbreeder
         #Re-encounter
         logit( mn.pA[sc, t, s] ) <- eta[7, s, t] + 
-          lmus[7, s] + betas[7]*perc.hacked.5yr[sc, t]*equals(s,2) # resight of nonbreeders
+          lmus[7, s] + betas[7]*perc.hacked.5yr[sc, t, s] # resight of nonbreeders
         logit( mn.pB[sc, t, s] ) <- eta[8, s, t] +  
           lmus[8, s]  # resight of breeders
         } # s
@@ -543,16 +564,19 @@ run_pva <- function(info, datl, constl, code){
     "NB", "NF", "NFY", "N", "NAD", "Ntot",
     "r",
     # error terms
-    "eta", "sds2", "Ustar2", "U2", "R2",
+    "eta", "sds", "Ustar", "R",
     # yearly summaries
     'mn.phiFY', 'mn.phiA', 'mn.phiB',
     'mn.psiFYB', 'mn.psiAB', 'mn.psiBA',
     'mn.pA', 'mn.pB',
     # pva
-    "extinct", "extinctAD", "extinctB"
+    "extinct", "extinctAD", "extinctB"#,
+    # "perc.hacked.5yr", "perc.hacked", "num.hacked", "perc.treat",
+    # "numer.perc.treat", "denom.perc.treat"
   )
   #n.chains=1; n.thin=1; n.iter=50; n.burnin=25
-  n.chains=1; n.thin=400; n.iter=1000000; n.burnin=600000
+  #n.chains=1; n.thin=400; n.iter=600000; n.burnin=400000
+  n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -584,6 +608,7 @@ run_pva <- function(info, datl, constl, code){
 #*****************
 #* Run chains in parallel
 #*****************
+
 this_cluster <- makeCluster(cpus)
 post <- parLapply(cl = this_cluster, 
                   X = par_info_pva[1:cpus], 

@@ -3,6 +3,8 @@ library('nimble')
 library('parallel')
 library ('coda')
 load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+#load("data/data.rdata")
+cpus <- 5
 
 #**********************
 #* Parameter descriptions
@@ -54,8 +56,8 @@ mycode <- nimbleCode(
     ###################################################
     # survival, recruitment, and detection can be correlated
     for (k in 1:8){
-      betas[k] ~ dunif(-20, 20)  # prior for translocations coefficients
-      deltas[k] ~ dunif(-20, 20) # prior for survey effort coefficients
+      betas[k] ~ dnorm(0, sd=20)  # prior for translocations coefficients
+      deltas[k] ~ dnorm(0, sd=10) # prior for survey effort coefficients
     } # k
     
     for (j in 1:8){
@@ -64,30 +66,21 @@ mycode <- nimbleCode(
         mus[j,s] ~ dbeta(1,1) # prior for overall means
       }}     # 
     
-    # # Temporal random effects and correlations among all sites
-    # for (j in 1:p){ sds[j] ~ dexp(1) }# prior for temporal variation
-    # # estimated using the multivariate normal distribution
-    # R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    # Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    # U[1:p,1:p] <- uppertri_mult_diag(Ustar[1:p, 1:p], sds[1:p])
-    # # multivariate normal for temporal variance
-    # for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
-    #   eps[1:p,t] ~ dmnorm(mu.zeroes[1:p],
-    #                       cholesky = U[1:p, 1:p], prec_param = 0)
-    # }
-    
     # Temporal random effects and correlations between sites
-    for (jj in 1:p2){ sds2[jj] ~ dexp(1) }# prior for temporal variation
+    # Non-centered parameterization of the multivariate normal distribution to improve convergence
+    for (jj in 1:p){ sds[jj] ~ dexp(1) }# prior for temporal variation
     # estimated using the multivariate normal distribution
-    R2[1:p2,1:p2] <- t(Ustar2[1:p2,1:p2]) %*% Ustar2[1:p2,1:p2] # calculate rhos, correlation coefficients
-    Ustar2[1:p2,1:p2] ~ dlkj_corr_cholesky(eta=1.1, p=p2) # Ustar is the Cholesky decomposition of the correlation matrix
-    U2[1:p2,1:p2] <- uppertri_mult_diag(Ustar2[1:p2, 1:p2], sds2[1:p2])
+    R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
+    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
     # multivariate normal for temporal variance
     for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
       for (s in 1:nsite){
-        eta[1:p2,s,t] ~ dmnorm(mu.zeroes2[1:p2],
-                               cholesky = U2[1:p2, 1:p2], prec_param = 0)
+        eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
+        for(j in 1:p){
+          z.score[j,s,t] ~ dnorm(0, sd=1)  # z-scores
+        } # j
       } } # s t 
+    
     #######################
     # Derived params
     #######################
@@ -104,7 +97,7 @@ mycode <- nimbleCode(
     for (s in 1:nsite){
       lmu.prod[s] ~ dnorm(0, sd=5)
     } # s
-    gamma ~ dunif(-20, 20)
+    gamma ~ dnorm(0, sd=10)
     rr ~ dexp(0.05)
     
     # Productivity likelihood      
@@ -179,9 +172,10 @@ mycode <- nimbleCode(
         NB[t, s] <- sum(N[5:7, t, s]) # number of adult breeder females
         NAD[t, s] <- NF[t, s] + NB[t, s] # number of adults
         Ntot[t, s] <- sum(N[1:7, t, s]) # total number of females
-        log(lamAD[t, s]) <- log(NAD[t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2
+        log(lamAD[t, s]) <- log(NAD[t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2  
+        #deltas[9]*effort.shift[t,s]
         log(lamFY[t, s]) <- log(N[1, t, s]) + deltas[3]*effort2[t, s] + deltas[4]*effort2[t, s]^2
-        }# s
+      }# s
       # First-years at different sites have different distributions
       # for better model fit
       countsFY[t, 1] ~ dpois(lamFY[t, 1]) # doesn't have any zeroes so poisson
@@ -387,8 +381,7 @@ run_ipm <- function(info, datl, constl, code){
     "r",
     "N", "Ntot",
     # error terms
-    #"eps", "sds", "Ustar", "U", "R",
-    "eta", "sds2", "Ustar2", "U2", "R2",
+    "eta", "sds", "Ustar", "R", "z.score",
     # yearly summaries
     'mn.phiFY', 'mn.phiA', 'mn.phiB',
     'mn.psiFYB', 'mn.psiAB', 'mn.psiBA',
@@ -400,9 +393,10 @@ run_ipm <- function(info, datl, constl, code){
     "tvm.obs", "tvm.rep",
     "tturn.obs", "tturn.rep"
   )
-  #n.chains=1; n.thin=1; n.iter=500; n.burnin=100
+  #n.chains=1; n.thin=1; n.iter=50; n.burnin=10
   #n.chains=1; n.thin=200; n.iter=800000; n.burnin=600000
-  n.chains=1; n.thin=200; n.iter=600000; n.burnin=400000
+  n.chains=1; n.thin=100; n.iter=300000; n.burnin=200000
+  # n.chains=1; n.thin=100; n.iter=100000; n.burnin=50000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -434,10 +428,9 @@ run_ipm <- function(info, datl, constl, code){
 #*****************
 #* Run chains in parallel
 #*****************
-par_info <- par_info[1:10]
-this_cluster <- makeCluster(10)
+this_cluster <- makeCluster(cpus)
 post <- parLapply(cl = this_cluster, 
-                  X = par_info, 
+                  X = par_info[1:cpus], 
                   fun = run_ipm, 
                   datl = datl, 
                   constl = constl, 

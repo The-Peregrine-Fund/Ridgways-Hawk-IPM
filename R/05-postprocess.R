@@ -3,13 +3,14 @@ library ('MCMCvis')
 library ('coda')
 library ('ggplot2')
 library('reshape2')
-library ("tidybayes")
+library ('tidybayes')
 library ('bayestestR')
-library ("ggpubr")
-library("viridis")
-library ("HDInterval")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
+library ('ggpubr')
+library('viridis')
+library ('HDInterval')
+library ('abind')
 load("data/data.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun_nc.rdata")
 out <- lapply(post, as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
 
@@ -134,10 +135,10 @@ p1 <- ggplot() + theme_minimal(base_size=14) +
   xlab("Year") + ylab("Number")
 p1
 
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance and counts.tiff",
-#        plot=p1,
-#        device="tiff",
-#        width=9, height=4, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance and counts.tiff",
+       plot=p1,
+       device="tiff",
+       width=9, height=4, dpi=300)
 
 #### ----popstructure -----
 # Plot life stage structure
@@ -236,10 +237,10 @@ p5 <- ggplot() +  theme_minimal(base_size=14) +
 
 p35 <- ggarrange(p3, p5, ncol=1, nrow=2)
 p35
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Stage structure_abundance.tiff",
-#        plot=p35,
-#        device="tiff",
-#        width=6, height=8, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Stage structure_abundance.tiff",
+       plot=p35,
+       device="tiff",
+       width=6, height=8, dpi=300)
 
 #### ---- survival -----
 # plot survival, recruitment, and detection
@@ -255,7 +256,7 @@ lmus <- melt(mus.mat)
 colnames(lmus) <- c("Parameter", "Site", "Iter", "value")
 
 p6 <- ggplot(data= lmus, aes(x=value, y=Parameter )) +
-  stat_halfeye(point_interval=median_hdi, .width = c(.95, .80)) +
+  stat_halfeye(point_interval=median_hdci, .width = c(.95, .80)) +
   coord_flip() +
   facet_wrap("Site") +
   xlab("Probability") + ylab("Parameter") +
@@ -264,10 +265,10 @@ p6 <- ggplot(data= lmus, aes(x=value, y=Parameter )) +
         panel.grid.minor.x = element_blank()) 
 
 p6
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Survival Recruitment Detection.tiff",
-#        plot=p5,
-#        device="tiff",
-#        width=8, height=4, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Survival Recruitment Detection.tiff",
+       plot=p5,
+       device="tiff",
+       width=8, height=4, dpi=300)
 
 # print estimates
 mds <- tapply(lmus$value, list(lmus$Parameter, lmus$Site), median) |> round(2)
@@ -295,35 +296,36 @@ for (m in ind){
 mus.md <- apply(pred.mus, c(1,2), median)
 mus.HDI80 <- apply(pred.mus, c(1,2), HDInterval::hdi, credMass=0.8)
 mus.HDI95 <- apply(pred.mus, c(1,2), HDInterval::hdi)
-# tiff(height=4, width=6, units="in", res=300,
-#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Translocation effects.tiff")
-par(mar=c(3,4,4,1), mfrow=c(1,1))
+tiff(height=4, width=6, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Translocation effects.tiff")
+par(mar=c(4,4,4,1), mfrow=c(1,1))
 for (tr in 1:2){
   if (tr==1){
-    plot(1:4, c(0,0,1,1), 
+    plot(1:3, c(0,0,1), 
          type="n",
          pch=c(16, 17)[tr], cex=2,
          ylim=c(0,1),
-         xlim=c(0.5, 4.5), 
+         xlim=c(0.5, 3.5), 
          cex.axis=1, cex.lab=1.25,
          ylab="Probability", xlab="",
          main="",
          xaxt="n", yaxt="n")
   abline(h= seq(0,1,by=0.1), col="gray90")
   abline(v= seq(0.5,6,by=1), col="gray90")
-  points(1:4+c(-0.1,0.1)[tr], mus.md[ind,tr], 
+  points(1:3+c(-0.1,0.1)[tr], mus.md[ind,tr], 
          pch=c(16, 17)[tr], cex=1.5)
   }else{
-    points(1:4+c(-0.1,0.1)[tr], mus.md[ind,tr], 
+    points(1:3+c(-0.1,0.1)[tr], mus.md[ind,tr], 
            pch=c(16, 15)[tr], cex=1.5)
   }}
 
-axis(1, at=1:4, cex.axis=0.85,
+axis(1, at=1:3, cex.axis=0.85,
      labels=c("First-year\nSurvival", 
               "Breeder\nSurvival", 
-              "Nonbreeder\n to Breeder\nRecruitment", 
-              "Nonbreeder\nDetection"), las=1, padj=0.5)
-axis(2, at=seq(0,1, by=0.1), cex.axis=1,
+              "Nonbreeder\n to Breeder\nRecruitment"), 
+              #"Nonbreeder\nDetection"), 
+     las=1, padj=0.5)
+axis(2, at=seq(0,1, by=0.1), cex.axis=1, las=1,
      labels=c(0, NA,NA,NA,NA,0.5, NA,NA,NA,NA, 1))
 for (m in 1:length(ind)){
   for (tr in 1:2){
@@ -333,7 +335,7 @@ for (m in 1:length(ind)){
 legend(x=2.5,y=1.25, pch=c(16,15), pt.cex=1.5, cex=1, xpd=NA, horiz=T, 
        legend=c("Not translocated", "Translocated" ),
        xjust=0.5)
-#dev.off()
+dev.off()
 
 #### ---- productivity -----
 # Plot fecundity in response to nest treatments
@@ -508,9 +510,8 @@ plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, ind.y=1:12, site=1, y
 # the magnitude of the correlation
 # P(r>0) is the probability of direction (similar to p-values)
 # that is, the probability that an effect exists
-# tiff(height=8, width=8, units="in", res=300,
-#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics1.tiff")
-# par(mfrow=c(4,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
+tiff(height=8, width=8, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics1.tiff")
 par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
 plot.cor(outp$lambda, outp$mn.prod, x.lab="Fecundity", ind.x=2:13)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n")
@@ -520,10 +521,10 @@ plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n")
 plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n")
 mtext("Population growth rate", side=2, outer=TRUE, line=2.5, cex=2)
 mtext("Los Haitises", side=3, outer=TRUE, cex=2)
-#dev.off()
+dev.off()
 
-# tiff(height=4, width=8, units="in", res=300,
-#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics2.tiff")
+tiff(height=4, width=8, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics2.tiff")
 par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
 plot.cor(outp$lambda, outp$mn.prod, x.lab="Fecundity", ind.x=2:13, site=2)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n", site=2)
@@ -533,7 +534,7 @@ plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", s
 plot.cor(outp$lambda, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n", site=2)
 mtext("Abundance", side=2, outer=TRUE, line=2.5, cex=2)
 mtext("Punta Cana", side=3, outer=TRUE, cex=2)
-#dev.off()
+dev.off()
 
 # Is there evidence of density dependence
 par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
@@ -545,10 +546,7 @@ plot.cor(outp$Ntot, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n")
 plot.cor(outp$Ntot, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n")
 mtext("Abundance", side=2, outer=TRUE, line=2.5, cex=2)
 mtext("Los Haitises", side=3, outer=TRUE, cex=2)
-#dev.off()
 
-# tiff(height=4, width=8, units="in", res=300,
-#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics2.tiff")
 par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
 plot.cor(outp$Ntot, outp$mn.prod, x.lab="Fecundity", ind.x=2:13, site=2)
 plot.cor(outp$Ntot, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n", site=2)
@@ -558,10 +556,247 @@ plot.cor(outp$Ntot, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", sit
 plot.cor(outp$Ntot, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n", site=2)
 mtext("Population growth rate", side=2, outer=TRUE, line=2.5, cex=2)
 mtext("Punta Cana", side=3, outer=TRUE, cex=2)
-#dev
+dev.off()
 
-#### ---- pva -----
+#********************
+# Transient Life Table Response Experiment (tLTRE)
+# Overall contributions
+#********************
+lambda <- expression( ( # numerator start
+                      (nfy*phiFY*psiFYB*f*0.5 + # repro of first year breeders
+                       nf*phiA*psiAB*f*0.5 + # repro of nonbreeders to breeders
+                       nb*phiB*(1-psiBA)*f*0.5) + # repro of breeders remaining breeders
+                       nfy*phiFY*(1-psiFYB)  +
+                       nf*phiA*(1-psiAB) +
+                       nb*phiB*psiBA +
+                       nfy*phiFY*psiFYB +
+                       nb*phiB*(1-psiBA) ) / # numerator end
+                       (nfy+nf+nb) # denominator
+                      ) # expression end
+
+# Calculate proportional population sizes
+nyr <- nrow(outp$NFY)-1
+niter <- dim(outp$NFY)[[3]]
+n1 <- outp$NFY[1:nyr, ,] / outp$Ntot[1:nyr, ,]
+n2 <- outp$NF[1:nyr, ,] / outp$Ntot[1:nyr, ,]
+n3 <- outp$NB[1:nyr, ,] / outp$Ntot[1:nyr, ,]
+
+# Extract the mean demographic rates and population sizes and store them in a list
+mu <- list(phiFY=outp$mus[1,,], phiA=outp$mus[2,,], phiB=outp$mus[3,,], 
+           psiFYB=outp$mus[4,,], psiAB=outp$mus[5,,], psiBA=outp$mus[6,,], 
+           f=exp(outp$lmu.prod),
+           nfy=apply(n1, c(2,3), mean), nf=apply(n2, c(2,3), mean), nb=apply(n3, c(2,3), mean))
+
+# Calculate sensitivities
+nms <- c('phiFY', 'phiA', 'phiB',
+          'psiFYB', 'psiAB', 'psiBA', 
+          'f', 
+          'nfy', 'nf', 'nb' )
+sens.func <- function( name, expr=lambda, envir=mu) { eval(D(expr=expr, name=name), envir=envir) }
+sensl <- lapply(nms, sens.func)
+names(sensl) <- nms
+sens <- abind(sensl, along=3)
+
+# Define matrix to store results
+cont <- array(NA, dim=c(2, niter, 10) )
+dimnames(cont)[[3]] <- nms
+
+# Calculate contributions for each demographic rate and stage-structured population size at each MCMC draw
+for (i in 1:niter){
+  for (s in 1:2){
+  dp_stoch <- cbind(outp$mn.phiFY[1:12,s,i], outp$mn.phiF[1:12,s,i], outp$mn.phiB[1:12,s,i], 
+                    outp$mn.psiFYB[1:12,s,i], outp$mn.psiAB[1:12,s,i], outp$mn.psiBA[1:12,s,i],
+                    outp$mn.prod[2:13,s,i],
+                    n1[1:12,s,i], n2[1:12,s,i], n3[1:12,s,i])
+  # Derive process variance and covariance among demographic parameters using shrunk estimates of
+  #     demographic rates and proportional pop. sizes
+  dp_varcov <- var(dp_stoch)
+  sensvec <- sens[s, i, ]
+  # Calculate demographic contributions
+  contmatrix <- dp_varcov * outer(sensvec, sensvec)
+  cont[s, i,  ] <- rowSums(contmatrix)
+}}
+
+CRI <- apply(cont[,,], c(1,3), quantile, probs=c(0.025, 0.975))
+names.arg <- c(expression(italic(phi)[italic(FY)]),
+               expression(italic(phi)[italic(A)]),
+               expression(italic(phi)[italic(B)]),
+               expression(italic(psi)[italic(FYB)]),
+               expression(italic(psi)[italic(AB)]),
+               expression(italic(psi)[italic(BA)]),
+               expression(italic(f)),
+               expression(italic(n)[italic(FY)]),
+               expression(italic(n)[italic(A)]), 
+               expression(italic(n)[italic(B)]))
+tiff(height=4, width=6, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//LTRE_overall.tiff")
+par(mfrow=c(2,1), mar=c(3,5,1,1))
+a <- barplot(colMeans(cont[1,,]), names.arg=names.arg, 
+             ylab=expression( paste("Contribution to ", lambda) ), las=1,
+             ylim=range(CRI[,1,]), col=rep("grey65", 10),
+             border=rep("grey65", 10),
+             main="Los Haitises", font.main=1, 
+             yaxt="n")
+axis(2, at=c(0, 0.01, 0.02, 0.03), las=1)
+segments(a, CRI[1,1,], a, CRI[2,1,], lwd=1.5)
+
+b <- barplot(colMeans(cont[2,,]), names.arg=names.arg, 
+             ylab=expression( paste("Contribution to ", lambda) ), las=1,
+             ylim=range(CRI[,2,]), col=rep("grey65", 10),
+             border=rep("grey65", 10), 
+             main="Punta Cana", font.main=1,
+             yaxt="n")
+axis(2, at=c(0, 0.01, 0.02, 0.03), las=1)
+segments(a, CRI[1,2,], a, CRI[2,2,], lwd=1.5)
+dev.off()
+
 #*******************
+# Transient Life Table Response Experiment (tLTRE) 
+# Inter-annual Contributions
+#*******************
+sens <- diff <- array(NA, dim=c(constl$nyr-1, 2, 10, dim(outp$mn.phiA)[[3]]),
+              dimnames=list(Year=2012:2023, 
+                            site=c('Los Haitises', 'Punta Cana'), 
+                            Param=c('phiFY', 'phiA', 'phiB',
+                                      'psiFYB', 'psiAB', 'psiBA', 
+                                      'f', 
+                                      'nfy', 'nf', 'nb' ),
+                            Iter=1:dim(outp$mn.phiA)[[3]]) )
+
+getDiff <- function(x){
+            x[2:constl$nyr, , ] - x[1:(constl$nyr-1), , ]
+}
+diff[,,'phiFY',] <- getDiff(outp$mn.phiFY)
+diff[,,'phiA',] <- getDiff(outp$mn.phiA)
+diff[,,'phiB',] <- getDiff(outp$mn.phiB)
+diff[,,'psiFYB',] <- getDiff(outp$mn.psiFYB)
+diff[,,'psiAB',] <- getDiff(outp$mn.psiAB)
+diff[,,'psiBA',] <- getDiff(outp$mn.psiBA)
+diff[,,'f',] <- getDiff(outp$mn.prod)
+diff[,,'nfy',] <- getDiff( outp$NFY/outp$Ntot )
+diff[,,'nf',] <- getDiff( outp$NF/outp$Ntot )
+diff[,,'nb',] <- getDiff( outp$NB/outp$Ntot )
+
+getMn <- function(x) {
+  ( x[2:constl$nyr, , ] + x[1:(constl$nyr-1), , ] ) / 2
+} 
+means <- list('phiFY' = getMn(outp$mn.phiFY), 
+              'phiA' = getMn(outp$mn.phiA), 
+              'phiB' = getMn(outp$mn.phiB),
+              'psiFYB' = getMn(outp$mn.psiFYB), 
+              'psiAB' = getMn(outp$mn.psiAB),
+              'psiBA' = getMn(outp$mn.psiBA),
+              'f' = getMn(outp$mn.prod), 
+              'nfy' = getMn(outp$NFY), 
+              'nf' = getMn(outp$NF), 
+              'nb' =  getMn(outp$NB) )
+
+sens[,,'phiFY',] <- eval( D(lambda, "phiFY" ), envir = means )
+sens[,,'phiA',] <- eval( D(lambda, "phiA" ), envir = means )
+sens[,,'phiB',] <- eval( D(lambda, "phiB" ), envir = means )
+sens[,,'psiFYB',] <- eval( D(lambda, "phiFYB" ), envir = means )
+sens[,,'psiAB',] <- eval( D(lambda, "psiAB" ), envir = means )
+sens[,,'psiBA',] <- eval( D(lambda, "psiBA" ), envir = means )
+sens[,,'f',] <- eval( D(lambda, "f" ), envir = means )
+sens[,,'nfy',] <- eval( D(lambda, "nfy" ), envir = means )
+sens[,,'nf',] <- eval( D(lambda, "nf" ), envir = means )
+sens[,,'nb',] <- eval( D(lambda, "nb" ), envir = means )
+
+conts <- diff*sens
+
+# ~~~~ figure 9.7 ~~~~
+# Create a plot for the sequential differences in finite growth rates
+niter <- dim(outp$mn.phiA)[[3]]
+nyrs <- constl$nyr-1
+diff.lam <- outp$lambda[2:nyrs, , ] - outp$lambda[1:(nyrs-1), ,]
+differences <- cbind(2012:2022, apply(diff.lam, c(1,2), mean))
+differences <- rbind(differences, c(2023, NA, NA))
+
+# Mean contributions
+V <- apply(conts, 3:1, mean)
+V1 <- V2 <- V
+V1[V1<0] <- 0
+V2[V2>0] <- 0
+
+# Make figure
+colors <- c(colorRampPalette(c("blue4", "lightblue"))(3),
+             colorRampPalette(c("darkred", "yellow"))(3),
+             colorRampPalette(c("darkviolet"))(1), 
+             colorRampPalette(c("lightgreen", "darkgreen"))(3))
+
+legend.text <- c(expression(italic(phi)[italic(FY)]),
+                 expression(italic(phi)[italic(A)]),
+                 expression(italic(phi)[italic(B)]),
+                 expression(italic(psi)[italic(FY:B)]),
+                 expression(italic(psi)[italic(A:B)]),
+                 expression(italic(psi)[italic(B:A)]),
+                 expression(italic(f)),
+                 expression(italic(n)[italic(FY)]),
+                 expression(italic(n)[italic(A)]), 
+                 expression(italic(n)[italic(B)]))
+
+tiff(height=6.5, width=8, units="in", res=300,
+     filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//LTRE.tiff")
+par(mfrow=c(2,2), mar=c(1, 2, 0, 1), oma=c(7,7,1,1))
+txt.size <- 1.5
+yl <- list(bquote( paste("Difference in population")),
+         bquote( paste("growth rate (", Delta, lambda, ")" )) ) 
+barplot(differences[,2], ylim=c(-0.16, 0.16),
+        #ylab=expression( paste("Difference in population", "\ngrowth rate (", Delta, lambda, ")" )), 
+        ylab= "",
+        xpd=NA,
+        axes=FALSE, border=NA,
+        cex.lab=txt.size, main="Los Haitises", cex.main=txt.size, 
+        font.main=1 )
+mtext(do.call(expression,yl), side=2, cex=txt.size,
+      line=c(5,3.5) )
+axis(2, las=1)
+abline(h=0)
+
+barplot(differences[,3], ylim=c(-1.5, 1.5),
+        ylab="", 
+        xpd=NA,
+        axes=FALSE, border=NA, main="Punta Cana",
+        cex.main=txt.size, 
+        font.main=1)
+axis(2, las=1)
+abline(h=0)
+
+barplot(V1[,1,], ylim=c(-0.19, 0.19), 
+        col=colors, ylab="",
+        xlab="", 
+        xpd=NA,
+        axes=FALSE,
+        border=NA,
+        cex.lab=txt.size)
+mtext(expression( paste("Contribution to ", Delta, lambda) ), side=2, cex=txt.size,
+      line=4.25)
+barplot(V2[,1,], add=TRUE, col=colors, axes=FALSE, border=NA)
+axis(2, las=1)
+abline(h=0)
+
+barplot(V1[,2,], ylim=c(-0.12, 0.12), 
+        col=colors, ylab="",
+        xlab="", axes=FALSE,  
+        names.arg=2012:2023,
+        border=NA)
+barplot(V2[,2,], add=TRUE, col=colors, axes=FALSE, border=NA)
+axis(2, las=1)
+abline(h=0)
+mtext(side=1 , outer=TRUE, "Beginning year", line=2.5, cex=txt.size)
+reset <- function() {
+  par(mfrow=c(1, 1), oma=rep(0, 4), mar=rep(0, 4), new=TRUE)
+  plot(0:1, 0:1, type="n", xlab="", ylab="", axes=FALSE)
+}
+reset()
+legend(legend = legend.text, fill=colors,
+       bty="n", x="bottom", border=NA, 
+       xpd=NA, x.intersp=0.005, text.width=NA,
+       cex=1.5, horiz=TRUE)
+dev.off()
+
+#*******************
+#### ---- pva -----
 #* Plot PVA results
 #*******************
 library ('viridis')
@@ -573,10 +808,10 @@ library('ggplot2')
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_longrun.rdata")
 out <- lapply(post, as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
-scen <- data.frame('Scenarios' = 1:36,
-                   'Number translocated' = rep(c(0,5,10), each=12), 
-                   'Number of nests treated' = rep( rep(c(0, 15, 30, 45), each=3), 3),
-                   'Mortality reduction' = rep(c('100% Mortality', '80% Mortality', '60% Mortality'), 12) )
+scen <- data.frame('Scenarios' = 1:45,
+                   'Number translocated' = rep(c(0,5,10), each=15), 
+                   'Number of nests treated' = rep( rep(c(0, 15, 30, 45, 100), each=3), 3),
+                   'Mortality reduction' = rep(c('100% Mortality', '80% Mortality', '60% Mortality'), 15) )
 
 #*********************
 #* Line plot of extinction probability over time
@@ -587,7 +822,7 @@ colnames(lpe) <- c('Scenarios', 'Time', 'Site2', 'Extinct')
 pe.df <- merge(lpe, scen, by='Scenarios', all.x=TRUE)
 pe.df$Year <- pe.df$Time+2023
 pe.df$Site <- ifelse(pe.df$Site2==1, "Los Haitises", "Punta Cana")
-pe.df[(pe.df$Site2==2 & pe.df$Number.translocated>0),]$Extinct <- NA
+#pe.df[(pe.df$Site2==2 & pe.df$Number.translocated>0),]$Extinct <- NA
 pe.df$Mortality.reduction <- factor(pe.df$Mortality.reduction, 
                                     levels= c('100% Mortality', '80% Mortality', '60% Mortality'))
 
@@ -595,9 +830,11 @@ p6 <- ggplot(pe.df, aes(x=Year, y=Extinct, group=Scenarios,
                   color = factor(Number.translocated), 
                   linetype = factor(Number.of.nests.treated))) +
   geom_line( linewidth = 1) +
-  facet_grid(rows=  vars(Site), cols= vars(Mortality.reduction), 
-             scales='free_y') +
-  #facet_wrap(~  Site + Mortality.reduction) +
+  facet_grid(rows=  vars(Site, factor(Number.translocated)), 
+             cols= vars(Mortality.reduction)) +
+  # facet_grid(rows=  vars(Site) , cols= vars(Mortality.reduction), 
+  #            scales='free_y') +
+  #facet_wrap(~  Site + Mortality.reduction, scales='free_y') +
   scale_color_viridis_d(option="viridis", direction=1,
                         name="Number translocated") +
   scale_linetype(name="Number of nests treated") +
@@ -605,13 +842,17 @@ p6 <- ggplot(pe.df, aes(x=Year, y=Extinct, group=Scenarios,
                       breaks=c(2020, 2030, 2040, 2050, 2060, 2070),
                      labels=c('', '2030', '', '2050', '', '2070'), 
                      minor_breaks=NULL) +
-  theme_minimal() + 
-  ylab("Extinction probability")
+  scale_y_continuous( name="Extinction probability",
+                      breaks=seq(0, 1, by=0.1),
+                      labels=c('0', '', '', '', '', '0.5', '', '', '', '', '1'), 
+                      limits=c(0,1),
+                      minor_breaks=NULL) +
+  theme_minimal()  
 p6
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_lines.tiff",
-#        plot=p6,
-#        device="tiff",
-#        width=6, height=4, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_lines.tiff",
+       plot=p6,
+       device="tiff",
+       width=6, height=4, dpi=300)
 
 #********************
 #* PVA heatmap of extinction probability projected 50 years
@@ -631,10 +872,10 @@ p7 <- ggplot(pe.df2, aes(x = as.factor(Number.translocated),
   scale_x_discrete(name="Number translocated") +
   theme_minimal( ) + theme(strip.background = element_rect(size = 0.5))
 p7  
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_50yrHeatmap.tiff",
-#        plot=p7,
-#        device="tiff",
-#        width=6, height=4, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_50yrHeatmap.tiff",
+       plot=p7,
+       device="tiff",
+       width=6, height=4, dpi=300)
 pe.df3 <- pe.df2[!is.na(pe.df2$Extinct),]
 pe.df3 <- pe.df3[rev(order(pe.df3$Site2, pe.df3$Extinct)),]
 pe.df3
@@ -648,8 +889,6 @@ lnt1$Site <- factor(ifelse(lnt1$Site2==1, 'Los Haitises', 'Punta Cana'))
 nt.df <- merge(lnt1, scen, by='Scenarios', all.x=TRUE)
 nt.df$Mortality.reduction <- factor(nt.df$Mortality.reduction,
                                     levels=c('100% Mortality','80% Mortality', '60% Mortality' ))
-nt.df[(nt.df$Site2==2 & nt.df$Number.translocated>0),]$Abund <- NA
-nt.df <- nt.df[nt.df$Scenarios %in% c(1,2,3), ]
 
 # calculate future means
 lnt2 <- apply(outp$Ntot[,13:63, , ], c(1, 2, 3), median) |> melt()
@@ -659,21 +898,20 @@ lnt2$Site <- factor(ifelse(lnt2$Site2==1, 'Los Haitises', 'Punta Cana'))
 nt.df2 <- merge(lnt2, scen, by='Scenarios', all.x=TRUE)
 nt.df2$Mortality.reduction <- factor(nt.df2$Mortality.reduction,
                                     levels=c('100% Mortality','80% Mortality', '60% Mortality' ))
-nt.df2[(nt.df2$Site2==2 & nt.df2$Number.translocated>0),]$Abund <- NA
 
 p8 <- ggplot() +
       stat_lineribbon(data= nt.df,  
                       aes(x=Year, y=Abund, group=Scenarios),
-                      fill='gray40',
+                      fill='gray60',
                       linewidth=0.5,
                       point_interval = 'median_hdci', .width = 0.95,
                        na.rm=TRUE) +
       geom_line(data= nt.df2,
-                aes(x=Year, y=Abund, group=Scenarios,
+                aes(x=Year, y=Abund, #group=Scenarios,
                     color = factor(Number.translocated),
                     linetype = factor(Number.of.nests.treated) ),
                 linewidth=0.5) +
-      facet_grid(rows = vars(Site), cols = vars(Mortality.reduction),
+      facet_grid(rows = vars(Site, Number.translocated), cols = vars(Mortality.reduction),
                  scales ='free_y') +
       ylab('Number of females') +
       scale_color_viridis_d(option="viridis", direction=1,
@@ -682,10 +920,10 @@ p8 <- ggplot() +
       theme_minimal()
   
 p8
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance_projections.tiff",
-#        plot=p9,
-#        device="tiff",
-#        width=8, height=4, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance_projections.tiff",
+       plot=p9,
+       device="tiff",
+       width=8, height=4, dpi=300)
 
 # Time to extinction
 # conditional on extinction threshold (D=X)

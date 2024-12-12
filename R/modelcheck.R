@@ -1,5 +1,5 @@
 #### ---- setup -------
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun_nc.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -294,16 +294,8 @@ plt(object=out,
     main="Anti-Parasitic Fly\nTreatment Effects", ylim=c(0,3))
 
 par(mfrow=c(1,1))
-# sds <- paste0("sds[", 1:9, "]")
-# plt(object=out, params=sds,
-#     exact=TRUE, ISB=FALSE,
-#     main="Temporal SDs (synchrony among sites)",
-#     labels=c("FY survival", "NB survival", "B survival",
-#              "FY to B", "NB to B", "B to NB",
-#              "NB detection", "B detection",
-#              "Productivity"))
-sds2 <- paste0("sds2[", 1:9, "]")
-plt(object=out, params=sds2,
+sds <- paste0("sds[", 1:9, "]")
+plt(object=out, params=sds,
     exact=TRUE, ISB=FALSE,
     main="Site-temporal SDs", 
     labels=c("FY survival", "NB survival", "B survival",
@@ -313,25 +305,17 @@ plt(object=out, params=sds2,
 # Correlations among vital rates
 # Plot is messy with only a few strong correlations
 ind <- 1
-Rs <- R2s <- c()
+Rs <- c()
 for (i in 1:(nrow(outp$R)-1)){
   for (j in (i+1):nrow(outp$R)){
   Rs[ind] <- paste0("R[",i,", ", j, "]")
-  R2s[ind] <- paste0("R2[",i,", ", j, "]")
   ind <- ind+1
   }}
-# par(mfrow=c(2,1))
-# plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE,
-#     main="Correlations btw demographic rates\n over time (synchrony)",
-#     xlab = "Rhos", guide_lines=TRUE)
-# plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE,
-#     main="Correlations btw demographic rates\n over time (synchrony), continued...",
-#     xlab = "Rhos", guide_lines=TRUE)
 par(mfrow=c(2,1))
-plt(object=out, params=R2s[1:18], exact=TRUE, ISB=FALSE, 
+plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites",
     xlab = "Rhos", guide_lines=TRUE)
-plt(object=out, params=R2s[19:36], exact=TRUE, ISB=FALSE, 
+plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE, 
     main="Correlations btw demographic rates\n over time and sites, continued ...",
     xlab = "Rhos", guide_lines=TRUE)
 
@@ -418,14 +402,14 @@ MCMCsummary(post2, params = "deltas",
             func=median, func_name="median")
 
 # Random effects for temporal synchrony and site x year. 
-MCMCsummary(post2, params = sds2, 
+MCMCsummary(post2, params = sds, 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
 # Correlations among demographic rates site x time
-MCMCsummary(post2, params = R2s, 
+MCMCsummary(post2, params = Rs, 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
@@ -433,11 +417,14 @@ MCMCsummary(post2, params = R2s,
 
 #### ---- traceplots ------
 MCMCtrace(post2, pdf=FALSE, params= "mus", Rhat=TRUE, priors=runif(20000, 0, 1), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "betas", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=runif(20000, -20, 20), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "sds2", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "R2")
+MCMCtrace(post2, pdf=FALSE, params= "lmu.prod", Rhat=TRUE, priors=rnorm(20000, 0, 5), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "betas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "sds", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "r", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "rr", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
+MCMCtrace(post2, pdf=FALSE, params= "R")
 
 #### ---- fit ------
 # Goodness of fit check

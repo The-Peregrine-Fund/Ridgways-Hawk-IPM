@@ -584,7 +584,7 @@ datl <- list( # productivity data
               prod = lp$fledged,
               # survival data
               y = y,
-              #z = z, 
+              z = z, 
               mu.zeroes = rep(0,p),
               mu.zeroes2 = rep(0,p2),
               # count data
@@ -611,8 +611,7 @@ constl <- list( # survival
             
                 pPrior = pPrior,
                 p = p, # number of random yr effects
-                p2 = p2, # number of random yr effects
-                
+
                 s.end=s.end,
                 hacked = as.numeric(hacked.cov.survival)-1,
                 hacked.counts = as.matrix( hacked[,-1] ),
@@ -653,6 +652,7 @@ for (i in 1:nrow(z.inits) ){
 z.inits[datl$y %in% c(1:3)] <- datl$y[datl$y %in% c(1:3)]
 # combine z.inits and z so we can drop z from data 
 z.inits <- ifelse(is.na(z.inits), z, z.inits)
+#z.inits[!is.na(z)] <- NA
 
 # # create inits for rhos
 rUstar <- array( runif(p*p, 0.01, 0.1), dim=c(p,p))
@@ -666,13 +666,8 @@ library ('MCMCvis')
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_simp.rdata")
 repro <- MCMCsummary(post, params = c("lmu.f", "gamma", "rr"))
 mus <- MCMCsummary(post, params = "mus")
-#sds <- MCMCsummary(post, params = "sds")
 sds2 <- MCMCsummary(post, params = "sds2")
 betas <- MCMCsummary(post, params = "betas")
-# u <- MCMCpstr(post, "Ustar", type="chains")
-# Ustar <- apply(u$Ustar, c(1,2), mean)
-# Ustar <- abs(Ustar)
-# diag(Ustar) <- 1
 u2 <- MCMCpstr(post, "Ustar2", type="chains")
 Ustar2 <- apply(u2$Ustar2, c(1,2), mean)
 Ustar2 <- abs(Ustar2)
@@ -705,17 +700,17 @@ inits.func1 <- function (){
   z = z.inits, 
   mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
   betas = betas$mean,
-  deltas = runif(10, -0.1, 0.1),
+  deltas = runif(8, -0.1, 0.1),
   alphas = array(runif(6*2, -0.1, 0.1), dim=c(6,2)),
-  #sds = sds$mean,
-  #Ustar = Ustar,
-  sds2 = sds2$mean,
-  Ustar2 = Ustar2,
+  sds = sds2$mean,
+  Ustar = Ustar2,
   # counts
-  #countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
+  # countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
   r = mean(outp$r),
   N = outp$N[1:7,1:13,1:2, 
-              sample(seq(1, 4000, by=400), 1, replace = F)] # sample from inits of chains that worked
+              sample(seq(1, 4000, by=400), 1, replace = F)], # sample from inits of chains that worked
+  z.scores = array(runif(constl$p2*constl$nsite*constl$nyr,  -0.1, 0.1),
+              dim=c(constl$p2, constl$nsite, constl$nyr))
   )}
 
 
@@ -781,14 +776,14 @@ inits.func.pva <- function (){
     mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
     betas = betas$mean,
     deltas = runif(8, -1, 1),
-    #sds = sds$mean,
-    #Ustar = Ustar,
-    sds2 = sds2$mean,
-    Ustar2 = Ustar2,
+    sds = sds2$mean,
+    Ustar = Ustar2,
     # counts
     countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
     r = mean(outp$r),
-    N = Ni.func()
+    N = Ni.func(),
+    z.scores = array(runif(constl$p2*constl$nsite*constl$nyr,  -0.1, 0.1),
+                     dim=c(constl$p2, constl$nsite, constl$nyr))
   )}
 
 
@@ -814,7 +809,7 @@ save(datl, constl, outp,
      par_info, par_info_pva,
      inits.func1, inits.func1, inits.func.pva, 
      z, seeds, 
-     repro, mus, #sds, Ustar,
+     repro, mus, 
      sds2, Ustar2, betas, # return estimates from Iipm_simp for initial values
      file="data\\data.rdata")
 
@@ -823,9 +818,6 @@ save(datl, constl, outp,
 #*********************
 
 # Check count data
-#colSums(counts.marked[2:3,,1]) + colSums(counts.marked[2:3,,1])
-#colSums(counts.marked[2:3,,2]) + colSums(counts.marked[2:3,,2])
-#colSums(counts.marked[2:3,,3]) + colSums(counts.marked[2:3,,3])
 colSums(table(df$ID, df$year.resighted))
 
 # Check survival data
