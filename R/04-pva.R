@@ -5,7 +5,7 @@ library ('coda')
 
 load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
 source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
-load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
+load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 
 # load("C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//ipm_longrun.rdata")
 # load("data//data.rdata")
@@ -70,7 +70,7 @@ Ni.func <- function (){
   return(Ni.pva)
 } # function
 
-u2 <- apply(outp$Ustar2, c(1,2), mean)
+u2 <- apply(outp$Ustar, c(1,2), mean)
 
 inits.func.pva <- function (){
   list(  
@@ -83,7 +83,7 @@ inits.func.pva <- function (){
     mus = apply(outp$mus, c(1,2), mean), 
     betas = apply(outp$betas, 1, mean),
     deltas = apply(outp$deltas, 1, mean),
-    sds =  apply(outp$sds2, 1, mean),
+    sds =  apply(outp$sds, 1, mean),
     Ustar = u2,
     # counts
     countsAdults= matrix(c(374, 335, 305, 295, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
@@ -167,7 +167,7 @@ mycode <- nimbleCode(
     R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
     Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
     # multivariate normal for temporal variance
-    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
+    for (t in 1:(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
       for (s in 1:nsite){
         eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
         for(j in 1:p){
@@ -438,7 +438,7 @@ mycode <- nimbleCode(
             equals(s,2) # set LH to zero 
         }}}
     
-    cap <- 0.98 # cap on maximum survival
+    cap <- 0.99 # cap on maximum survival
     for(sc in 1:SC){ 
       for (t in nyr:(nyr+K)){
         for (s in 1:nsite){
@@ -619,6 +619,6 @@ post <- parLapply(cl = this_cluster,
                   code = mycode)
 stopCluster(this_cluster)
 save(post, mycode, seeds, cpus,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_longrun.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_shortrun.rdata")
 # save(post, mycode, seeds, cpus,
 #      file="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//pva_survival_longrun.rdata")

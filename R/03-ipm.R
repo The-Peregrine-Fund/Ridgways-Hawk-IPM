@@ -270,7 +270,7 @@ mycode <- nimbleCode(
         logit(phiFY[i,t]) <- eta[1, site[i,t],t] + # eps[1,t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
         logit(phiA[i,t]) <- eta[2, site[i,t],t] + #eps[2,t] + 
-          lmus[2, site[i,t]] +  betas[2]*hacked[i] # nonbreeder
+          lmus[2, site[i,t]] #+  betas[2]*hacked[i] # nonbreeder
         logit(phiB[i,t]) <- eta[3, site[i,t],t] + #eps[3,t] + 
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
@@ -395,7 +395,7 @@ run_ipm <- function(info, datl, constl, code){
   )
   #n.chains=1; n.thin=1; n.iter=50; n.burnin=10
   #n.chains=1; n.thin=200; n.iter=800000; n.burnin=600000
-  n.chains=1; n.thin=100; n.iter=300000; n.burnin=200000
+  n.chains=1; n.thin=5; n.iter=10000; n.burnin=5000
   # n.chains=1; n.thin=100; n.iter=100000; n.burnin=50000
   
   mod <- nimbleModel(code, 
@@ -441,4 +441,4 @@ stopCluster(this_cluster)
 #      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 
 save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun.rdata")
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun_nohack.rdata")

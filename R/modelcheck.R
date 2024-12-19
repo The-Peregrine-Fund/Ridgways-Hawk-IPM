@@ -1,5 +1,5 @@
 #### ---- setup -------
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun_nc.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 load("data/data.rdata")
 library ('MCMCvis')
 library ('coda')
@@ -16,7 +16,7 @@ for (i in 1:length(out)){
 }
 # Subset chains to those with good initial values
 out <- out[!NAlist]
-post2 <- post[!NAlist]
+out <- out[1:4] # omit chain 5 bc one parameter causes a convergence failure
 outp <- MCMCpstr(out, type="chains")
 
 !NAlist
@@ -269,24 +269,6 @@ plt(object=out,
     labels= c("Productivity\n(log scale)\nLos Haitises",
               "Productivity\n(log scale)\nPunta Cana"))
 
-f <- exp(outp$lmu.prod)
-
-# Is fecundity at LHNP greater than PC
-par(mfrow=c(1,1))
-fdiff <- f[1,]-f[2,]
-hist(fdiff, main="Productivity difference")
-abline(v=0, lty=2)
-# print probability of direction, similar to frequentist p-value
-# so values <=0.025 and >=0.975
-# Is the difference in fecundity >0 ?
-mean(fdiff>0) 
-
-# How many times greater is fecundity 
-# at treated versus non-treated sites
-# median(f.pred[1,]/f[1,])
-# median(f.pred[2,]/f[2,])
-
-
 # gamma = nest treatment effect on fecundity
 par(mfrow=c(1,1))
 plt(object=out, 
@@ -302,23 +284,9 @@ plt(object=out, params=sds,
              "FY to B", "NB to B", "B to NB",
              "NB detection", "B detection",
              "Productivity"))
-# Correlations among vital rates
-# Plot is messy with only a few strong correlations
-ind <- 1
-Rs <- c()
-for (i in 1:(nrow(outp$R)-1)){
-  for (j in (i+1):nrow(outp$R)){
-  Rs[ind] <- paste0("R[",i,", ", j, "]")
-  ind <- ind+1
-  }}
-par(mfrow=c(2,1))
-plt(object=out, params=Rs[1:18], exact=TRUE, ISB=FALSE, 
-    main="Correlations btw demographic rates\n over time and sites",
-    xlab = "Rhos", guide_lines=TRUE)
-plt(object=out, params=Rs[19:36], exact=TRUE, ISB=FALSE, 
-    main="Correlations btw demographic rates\n over time and sites, continued ...",
-    xlab = "Rhos", guide_lines=TRUE)
 
+#---- demo_avs ----
+# Demographics- Annual Averages
 # Annual averages for integration into the population model
 par(mfrow=c(1,1))
 labs <- c(paste0("LH ",2011:2023), paste0("PC ",2011:2023))
@@ -377,12 +345,12 @@ abline(v=13.5, lwd=2)
 # Detection probability of breeders
 # modeled as logit(probability) = lmus[x,site] + betas[x]*translocated + eps[x,t] + eta[x,s,t]
 # except breeder to nonbreeder recruitment = lmus[6,site] 
-MCMCsummary(post2, params = "mus", 
+MCMCsummary(out, params = "mus", 
             digits=3, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
-MCMCsummary(post2, params = "betas", 
+MCMCsummary(out, params = "betas", 
             digits=3, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
@@ -390,41 +358,40 @@ MCMCsummary(post2, params = "betas",
 # Fecundity
 # modeled as log(f) = lmu.f[site] + gamma*treatment + eps[x,t] + eta[x,s,t]
 # log scale
-MCMCsummary(post2, params = "lmu.prod", 
+MCMCsummary(out, params = "lmu.prod", 
             digits=3, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
 # Effort effects on detections and resighting
-MCMCsummary(post2, params = "deltas", 
+MCMCsummary(out, params = "deltas", 
             digits=2, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
 # Random effects for temporal synchrony and site x year. 
-MCMCsummary(post2, params = sds, 
+MCMCsummary(out, params = sds, 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T,
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
 # Correlations among demographic rates site x time
-MCMCsummary(post2, params = Rs, 
+MCMCsummary(out, params = Rs, 
             exact=TRUE, ISB=FALSE,
             digits=2, HPD = T, 
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
 #### ---- traceplots ------
-MCMCtrace(post2, pdf=FALSE, params= "mus", Rhat=TRUE, priors=runif(20000, 0, 1), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "lmu.prod", Rhat=TRUE, priors=rnorm(20000, 0, 5), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "betas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "sds", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "r", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "rr", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
-MCMCtrace(post2, pdf=FALSE, params= "R")
+MCMCtrace(out, pdf=FALSE, params= "mus", Rhat=TRUE, priors=runif(20000, 0, 1), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "lmu.prod", Rhat=TRUE, priors=rnorm(20000, 0, 5), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "betas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "sds", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "r", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "rr", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
 
 #### ---- fit ------
 # Goodness of fit check
@@ -466,24 +433,32 @@ fit.check <- function(out, ratio=FALSE,
 }
 
 # Counts of adults (nonbreeders+breeders)
+# tiff(height=4, width=5, units="in", res=300,
+#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//GOF_adults.tiff")
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=1,
           lab="Adults(Breeder+Nonbreeder)- Poisson", jit=300)
+# dev.off()
 # Counts of first-year fledglings, ind=2
 # Poisson failed fit test bp=0
 # So we assigned negative binomial only for Punta Cana.
-# Los Haitises excluded from neg bin because no zeroes in counts. 
+# Los Haitises excluded from neg bin because no zeroes in counts.
+# tiff(height=4, width=5, units="in", res=300,
+#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//GOF_FY.tiff")
 fit.check(out, ratio=F,
           name.rep="dmape.rep", 
           name.obs="dmape.obs",
           ind=2,
           lab="First-year counts\nNeg binomial-Poisson", jit=300)
-
+# dev.off()
 # Productivity
+# tiff(height=4, width=5, units="in", res=300,
+#      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//GOF_prod.tiff")
 fit.check(out, ratio=F,
           name.rep="f.dmape.rep", 
           name.obs="f.dmape.obs",
           ind=1,
           lab="Productivity-Neg binomial", jit=300)
+# dev.off()

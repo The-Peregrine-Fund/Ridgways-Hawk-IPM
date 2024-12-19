@@ -19,69 +19,119 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Supplemental materials for: Rolek, B.W., McClure, CJW, Dunn, L., Curti, M., ... Ridgway's Hawk IPM and PVA
+Supplemental materials for: 
+Brian W. Rolek, Leah Dunn, Marta Curti, Russell Thorstrom, Evan Buechley, Carolina Granthon, Jeff Johnson, Carlos Suárez, Gabriela Diaz, and Christopher J. W. McClure. 2025. Management influences population persistence of the Critically Endangered Ridgway’s Hawk (Buteo ridgwayi) and creates tradeoffs between sites
 
 Contact information: rolek.brian@peregrinefund.org
 
-Metadata, data, and scripts used in analyses can be found at <https://github.com/The-Peregrine-Fund/XXXXX>.
+A permanent archive and DOI is available at: 
+<https://zenodo.org/doi/XXXXX>
+
+Metadata, data, and scripts used in analyses can be found at <https://github.com/The-Peregrine-Fund/Ridgways-Hawk-IPM>.
 
 The full workflow below is visible as a html website at:
-<https://the-peregrine-fund.github.io/XXXXX/>.
-
-A permanent archive and DOI is available at: https://zenodo.org/doi/XXXXX
+<https://the-peregrine-fund.github.io/Ridgways-Hawk-IPM/>.
 
 -----------------------------------------------------------------------   
-# 1. Code for IPM and PVA
+# 1. Code for Integrated Population Model (IPM)
 
-## 1.1 Submodels without Integration
+## 1.1 Model Code 
+### 1.1.1 Submodels without Integration
+We used a model without integration to obtain adequate initial values and reduce the chance of chains breaking during subsequent runs. 
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/02-ipm-simp.R')
 ```
 ```{r,ipm-simp, eval=FALSE, warning=FALSE, message=FALSE}
 ```
 
-## 1.2 Integrated Population Model
+### 1.1.2 Integrated Population Model
+Code for the Integrated Population Model. 
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/03-ipm.R')
 ```
 ```{r,ipm, eval=FALSE, warning=FALSE, message=FALSE}
 ```
 
-## 1.3 Population Viability Analysis  
-```{r, include=FALSE, cache=FALSE, warning=FALSE }
-knitr::read_chunk('R/04-pva_survival.R')
-```
-```{r,pva, eval=FALSE, warning=FALSE, message=FALSE}
-```
-
-# 2. Figures and tables
-
-## 2.1 Plot model estimates 
+## 1.2 IPM Results- Figures and Tables
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/05-postprocess.R')
 ```
 ```{r,postprocess, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
+### 1.2.1 Population Trends and Structure 
 ```{r,popstructure, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(6, 8)}
 ```
 
+### 1.2.2 Apparent Survival, Recruitment, and Detection 
 ```{r,survival, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
+### 1.2.3 Productivity
 ```{r,productivity, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-```{r,cors, eval=TRUE, warning=FALSE, message=FALSE}
+### 1.2.4 Correlations Among Demographic Rates and Detection
+R is the correlation coefficent between rates. Indices for R are demographics and detection parameters in both dimensions. For example, R[1,2] is the correlation coefficient between first-year survival and nonbreeder survival.   
+1. First-year Survival  
+2. Nonbreeder Survival   
+3. Breeder Survival   
+4. First-year recruitment to breeder  
+5. Nonbreeder recruitment to breeder  
+6. Breeder transition to nonbreeder  
+7. Nonbreeder detection  
+8. Breeder detection  
+9. Productivity  
+
+```{r,cors_demo, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-```{r,pva, eval=TRUE, warning=FALSE, message=FALSE}
+### 1.2.5 Population Growth Rates Over Time
+```{r,popgr, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-```{r,pva2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+### 1.2.6 Correlations Between Population Growth Rates and Demographics
+```{r,cors1, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
 ```
 
-## 2.2 Plots of finer population segments and model diagnostics
+### 1.2.7 Population Growth Rates and Contributions from Demographics
+```{r,contributions, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(8, 6)}
+```
+
+# 2. Population Viability Analysis (PVA)
+
+## 2.1 Model Code
+Code for Population Viability Analysis.
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/04-pva.R')
+```
+```{r,pva, eval=FALSE, warning=FALSE, message=FALSE}
+```
+
+## 2.2 PVA Results
+```{r, include=FALSE, cache=FALSE, warning=FALSE }
+knitr::read_chunk('R/05-postprocess.R')
+```
+
+### 2.2.1 Extinction Projections Over Time- Lines
+```{r,pva_ext1, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+```
+
+### 2.2.2 Extinction Projections for 2073- Heatmap
+```{r,pva_ext2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+```
+
+### 2.2.3 Abundance Projections
+```{r,pva_abund, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+```
+
+### 2.2.4 Time to Extinction
+```{r,pva_tt_ext, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+```
+
+# 3. Additional IPM plots
+
+## 3.1 Model Diagnostics
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/modelcheck.R')
 ```
@@ -92,50 +142,34 @@ knitr::read_chunk('R/modelcheck.R')
 ```{r,pltfunction, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-
-Plot model estimates of demographic rates. Life Stages are abbreviated as B = breeder, NB = nonbreeder, FY = first year. First-year abundance accounts for translocated birds. 
-
-```{r,catplots1, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 14)}
-```
-
-Population dynamics are determined by transitions, These transitions between stages are abbreviated as the starting life stage to the final life stage. For example a first-year recruiting to a breeder would be abbreviated as "FY to B". I'll list them here for convenience:
-
-"FY to NB" is first-year to nonbreeder.
-
-"NB to NB" is nonbreeder adult to nonbreeder adult.
-
-"B to NB" is a breeding adult to a nonbreeder adult.
-
-"FY to B" is first-year to breeder.
-
-"NB to B" is nonbreeder adult to breeder adult.
-
-"B to B" is breeder adult to breeder adult.
-
-```{r,catplots2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 14)}
-```
-
-Other parameter estimates. 
-```{r,catplots3, eval=TRUE, warning=FALSE, message=FALSE}
-```
-
-## 2.3 Print parameter estimates
-Parameter estimates for input into a population viability analysis.
-
-```{r,paramests, eval=TRUE, warning=FALSE, message=FALSE}
-```
-
-# 3. Model diagnostics
-
-## 3.1 Check Goodness-of-fit
+### 3.1.1 Check Goodness-of-fit
 Goodness-of-fit tests provide evidence that statistical distributions adequately describe the data. Here we test fit for brood size and counts. A Bayesian p-value nearest to 0.5 suggests good fitting statistical distributions, while values near 1 or 0 suggest poor fit.
 
 ```{r,fit, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-## 3.2 Examine Traceplots, Compare Posteriors with Priors
+### 3.1.2 Examine Traceplots, Compare Posteriors with Priors
 Traceplots provide evidence that models adequately converged.
 
 ```{r,traceplots, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
+## 3.2 Demographics- Annual Averages
+```{r,demo_avs, eval=TRUE, warning=FALSE, message=FALSE}
+```
+
+
+## 3.3 Abundance of Finer Population Segments
+
+Plot model estimates of demographic rates. Life Stages are abbreviated as B = breeder, NB = nonbreeder, FY = first year. First-year abundance accounts for translocated birds. 
+
+Population dynamics are determined by transitions, These transitions between stages are abbreviated as the starting life stage to the final life stage. For example a first-year recruiting to a breeder would be abbreviated as "FY to B". I'll list them here for convenience:  
+* "FY to NB" is first-year to nonbreeder.  
+* "NB to NB" is nonbreeder adult to nonbreeder adult.  
+* "B to NB" is a breeding adult to a nonbreeder adult.  
+* "FY to B" is first-year to breeder.  
+* "NB to B" is nonbreeder adult to breeder adult.  
+* "B to B" is breeder adult to breeder adult.  
+
+```{r,catplots2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 14)}
+```
