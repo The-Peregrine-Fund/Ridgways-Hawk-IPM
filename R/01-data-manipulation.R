@@ -772,14 +772,14 @@ inits.func.pva <- function (){
     gamma = repro$mean[3], 
     rr = repro$mean[4],
     # survival
-    z = z.inits, 
+    #z = z.inits, 
     mus = cbind(mus$mean[1:8], mus$mean[9:16]), # values from non-integrated run
     betas = betas$mean,
     deltas = runif(8, -1, 1),
     sds = sds2$mean,
     Ustar = Ustar2,
     # counts
-    countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
+    #countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
     r = mean(outp$r),
     N = Ni.func(),
     z.scores = array(runif(constl$p2*constl$nsite*constl$nyr,  -0.1, 0.1),

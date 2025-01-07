@@ -818,8 +818,8 @@ library ('coda')
 library ('MCMCvis')
 library ('reshape2')
 library('ggplot2')
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_medrun.rdata")
-out <- lapply(post, as.mcmc) 
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\pva_shortrun100k.rdata")
+out <- lapply(post[-5], as.mcmc) 
 outp <- MCMCpstr(out, type="chains")
 scen <- data.frame('Scenarios' = 1:45,
                    'Number translocated' = rep(c(0,5,10), each=15), 
@@ -835,7 +835,6 @@ colnames(lpe) <- c('Scenarios', 'Time', 'Site2', 'Extinct')
 pe.df <- merge(lpe, scen, by='Scenarios', all.x=TRUE)
 pe.df$Year <- pe.df$Time+2023
 pe.df$Site <- ifelse(pe.df$Site2==1, "Los Haitises", "Punta Cana")
-#pe.df[(pe.df$Site2==2 & pe.df$Number.translocated>0),]$Extinct <- NA
 pe.df$Mortality.reduction <- factor(pe.df$Mortality.reduction, 
                                     levels= c('100% Mortality', '80% Mortality', '60% Mortality'))
 
@@ -843,7 +842,7 @@ p6 <- ggplot(pe.df, aes(x=Year, y=Extinct, group=Scenarios,
                   color = factor(Number.translocated), 
                   linetype = factor(Number.of.nests.treated))) +
   geom_line( linewidth = 1) +
-  facet_grid(rows=  vars(Site, factor(Number.translocated)), 
+  facet_grid(rows= vars(Site, factor(Number.translocated)), 
              cols= vars(Mortality.reduction)) +
   # facet_grid(rows=  vars(Site) , cols= vars(Mortality.reduction), 
   #            scales='free_y') +
@@ -865,7 +864,7 @@ p6
 ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_lines.tiff",
        plot=p6,
        device="tiff",
-       width=6, height=4, dpi=300)
+       width=6, height=6, dpi=300)
 
 #### ---- pva_ext2 -----
 #********************
@@ -882,8 +881,8 @@ p7 <- ggplot(pe.df2, aes(x = as.factor(Number.translocated),
   facet_wrap(~  Site + factor(Mortality.reduction, 
                               levels=c("100% Mortality", "80% Mortality", "60% Mortality"))) +
   scale_y_discrete(breaks=c(0,15,30,45, 100), 
-                   name="Number of nests treated") +
-  scale_x_discrete(name="Number translocated") +
+                   name="Number of territories treated") +
+  scale_x_discrete(name="Number of females translocated") +
   theme_minimal( ) + theme(strip.background = element_rect(size = 0.5))
 p7  
 ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Extinction_50yrHeatmap.tiff",
@@ -906,7 +905,7 @@ nt.df <- merge(lnt1, scen, by='Scenarios', all.x=TRUE)
 nt.df$Mortality.reduction <- factor(nt.df$Mortality.reduction,
                                     levels=c('100% Mortality','80% Mortality', '60% Mortality' ))
 
-# calculate future means
+# calculate future medians
 lnt2 <- apply(outp$Ntot[,13:63, , ], c(1, 2, 3), median) |> melt()
 colnames(lnt2) <- c("Scenarios", "Time", "Site2", "Abund")
 lnt2$Year <- lnt2$Time + 2022
@@ -939,7 +938,53 @@ p8
 ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance_projections.tiff",
        plot=p8,
        device="tiff",
-       width=8, height=4, dpi=300)
+       width=8, height=6, dpi=300)
+
+#******************************
+#* Population change
+#* between 2023 and 2073
+#******************************
+ab2023 <- nt.df2[nt.df2$Year=='2023', ]
+ab2023 <- ab2023[order(ab2023$Scenarios, ab2023$Site2),]
+ab2073 <- nt.df2[nt.df2$Year=='2073', ]
+ab2073 <- ab2073[order(ab2073$Scenarios, ab2073$Time, ab2073$Site2),]
+
+ab2073$lambda <- ab2073$Abund / ab2023$Abund
+ab2073$pc <- (ab2073$lambda-1)*100
+
+# scale color so that percent change=0 is the middle color (gray),
+# -100 is the extreme lower bound and 811 is the extreme upper bound
+for (i in 1:length(ab2073$pc)){
+  if(ab2073$pc[i]<=0){  
+  ab2073$pc.sc[i] <- (ab2073$pc[i]-0)/sd(ab2073$pc[ab2073$pc<=0])}
+  else{ ab2073$pc.sc[i] <- (ab2073$pc[i]-0)/sd(ab2073$pc[ab2073$pc>0]) }
+}
+
+labs <- c(-100, 0, 400, 800)
+labs.sc <- c( (-100-0)/sd(ab2073$pc[ab2073$pc<=0]),
+              (0-0)/sd(ab2073$pc[ab2073$pc<=0]),
+              (400-0)/sd(ab2073$pc[ab2073$pc>0]),
+              (800-0)/sd(ab2073$pc[ab2073$pc>0]) )
+# plot
+p11 <- ggplot(ab2073, aes(x = as.factor(Number.translocated), 
+                         y = as.factor(Number.of.nests.treated))) +
+  geom_tile( aes(fill = pc.sc ) ) + 
+  geom_text(aes(label=round(pc,0)), color="white") +
+  scale_fill_viridis_c(option="cividis", direction=-1,
+                       name = "Percent change\nafter 50 years",
+                       breaks = labs.sc, labels = labs,
+                       begin=0, end=1) +
+  facet_wrap(~  Site + factor(Mortality.reduction, 
+                              levels=c("100% Mortality", "80% Mortality", "60% Mortality"))) +
+  scale_y_discrete(breaks=c(0, 15, 30, 45, 100), 
+                   name="Number of territories treated") +
+  scale_x_discrete(name="Number of females translocated") +
+  theme_minimal( ) + theme(strip.background = element_rect(size = 0.5))
+p11 
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance_50yrHeatmap.tiff",
+       plot=p11,
+       device="tiff",
+       width=6, height=4, dpi=300)
 
 #### ---- pva_tt_ext -----
 #*****************************

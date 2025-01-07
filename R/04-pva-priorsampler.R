@@ -3,9 +3,9 @@ library('nimble')
 library('parallel')
 library ('coda')
 
-load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
-source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
-load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
+# load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+# source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
+# load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 
 load("C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//ipm_longrun.rdata")
 load("data//data.rdata")
@@ -146,23 +146,21 @@ mycode <- nimbleCode(
     # Priors and constraints
     ###################################################
     # survival, recruitment, and detection can be correlated
-    for (k in 1:8){ 
-      betas[k] ~ dnorm(0, sd=20)  # prior for coefficients
-      deltas[k] ~ dnorm(0, sd=10)
-    } # k
     
     for (j in 1:8){
       for (s in 1:nsite){
         lmus[j,s] <- logit(mus[j,s])
-        mus[j,s] ~ dbeta(1,1) # prior for means
       }}     # m population #s sex #h hacked
     
     # Temporal random effects and correlations between sites
     # Non-centered parameterization of the multivariate normal distribution to improve convergence
-    for (jj in 1:p){ sds[jj] ~ dexp(1) }# prior for temporal variation
     R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
-    Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    for (t in 1:(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
+    for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
+      for (s in 1:nsite){
+        eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
+      } } # s t 
+
+    for (t in (nyr+1):(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
       for (s in 1:nsite){
         eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
         for(j in 1:p){
@@ -176,7 +174,7 @@ mycode <- nimbleCode(
     for(sc in 1:SC){
       for (s in 1:nsite){
         for (t in 1:(nyr-1+K)){
-          lambda[sc, t, s] <-  Ntot[sc, t+1, s]/(Ntot[sc, t, s]) # population groewth rate
+          lambda[sc, t, s] <-  Ntot[sc, t+1, s]/(Ntot[sc, t, s]) # population growth rate
           loglambda[sc, t, s] <- log(lambda[sc, t, s]) # r
         }} #t
       
@@ -192,23 +190,16 @@ mycode <- nimbleCode(
     ###############################
     # Likelihood for productivity
     ###############################
-    # Priors 
-    for (s in 1:nsite){
-      lmu.prod[s] ~ dnorm(0, sd=5)
-    } # s
-    gamma ~ dnorm(0, sd=10)
-    rr ~ dexp(0.05)
-    
-    # Productivity likelihood       
+    # # Productivity likelihood       
     for (k in 1:npairsobs){
       prod[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.prod[k])
-      log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
-        gamma*treat.pair[k] + 
-        eta[9, site.pair[k], year.pair[k] ] 
+      log(mu.prod[k]) <- lmu.prod[site.pair[k]] +
+        gamma*treat.pair[k] +
+        eta[9, site.pair[k], year.pair[k] ]
     } # k
     # Derive yearly productivity for population model
-    # need to reorder because nimble doesn't 
+    # need to reorder because nimble doesn't
     # handle nonconsecutive indices
     # yrind.pair is a matrix of indices for each site
     for (t in 1:nyr){
@@ -220,6 +211,7 @@ mycode <- nimbleCode(
         for(sc in 2:SC){
           mn.prod[sc, t, s] <- mn.prod[1,t,s]
         }}} # s t
+    
     # Future projections- fecundity
     for(sc in 1:SC){
       for (t in (nyr+1):(nyr+K) ){
@@ -247,8 +239,8 @@ mycode <- nimbleCode(
     for (v in 1:7){ 
       for (s in 1:nsite){
         # Subtract one to allow dcat to include zero
-        N[1, v, 1, s] <- N2[1, v, 1, s] - 1 
-        N2[1, v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s])
+        # N[1, v, 1, s] <- N2[1, v, 1, s] - 1 
+        # N2[1, v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s])
         # Assign estimates for years with data to all scenarios
         for (sc in 2:SC){
           N[sc, v, 1, s] <- N[1, v, 1, s]
@@ -316,7 +308,7 @@ mycode <- nimbleCode(
         NAD[1, t, s] <- NF[1, t, s] + NB[1, t, s] # number of adults
         Ntot[1, t, s] <- sum(N[1, 1:7, t, s]) # total number of females
         countsAdults[t, s] ~ dpois(lamAD[1, t, s]) # adult females
-        # constrain N1+hacked.counts to be >=0
+        # # constrain N1+hacked.counts to be >=0
         log(lamAD[1, t, s]) <- log(NAD[1, t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2
         log(lamFY[1, t, s]) <- log(N[1, 1, t, s]) + deltas[3]*effort2[t, s] + deltas[4]*effort2[t, s]^2
         for (sc in 2:SC){
@@ -362,7 +354,7 @@ mycode <- nimbleCode(
     for (t in 1:(nyr-1)){
       for (s in 1:nsite){
         for (xxxx in 1:surv.end[t,s]){
-          # need to reorder because nimble doesn't 
+          # need to reorder because nimble doesn't
           # handle nonconsecutive indices
           # yrind.surv is a matrix of indices for each site
           phiFY2[ t, s, xxxx] <- phiFY[ yrind.surv[xxxx,t,s], t]
@@ -374,7 +366,7 @@ mycode <- nimbleCode(
           pA2[ t, s, xxxx] <- pA[ yrind.surv[xxxx,t,s], t]
           pB2[ t, s, xxxx] <- pB[ yrind.surv[xxxx,t,s], t]
         } # xxxx
-        mn.phiFY[1, t, s] <- mean( phiFY2[ t, s, 1:surv.end[t,s] ] ) 
+        mn.phiFY[1, t, s] <- mean( phiFY2[ t, s, 1:surv.end[t,s] ] )
         mn.phiA[1, t, s] <- mean( phiA2[ t, s, 1:surv.end[t,s] ] )
         mn.phiB[1, t, s] <- mean( phiB2[ t, s, 1:surv.end[t,s] ] )
         mn.psiFYB[1, t, s] <- mean( psiFYB2[ t, s, 1:surv.end[t,s] ] )
@@ -383,9 +375,9 @@ mycode <- nimbleCode(
         mn.pA[1, t, s] <- mean( pA2[ t, s, 1:surv.end[t,s] ] )
         mn.pB[1, t, s] <- mean( pB2[ t, s, 1:surv.end[t,s] ] )
         for (sc in 2:SC){
-          mn.phiFY[sc, t, s] <- mn.phiFY[1, t, s] 
-          mn.phiA[sc, t, s] <- mn.phiA[1, t, s] 
-          mn.phiB[sc, t, s] <- mn.phiB[1, t, s] 
+          mn.phiFY[sc, t, s] <- mn.phiFY[1, t, s]
+          mn.phiA[sc, t, s] <- mn.phiA[1, t, s]
+          mn.phiB[sc, t, s] <- mn.phiB[1, t, s]
           mn.psiFYB[sc, t, s] <- mn.psiFYB[1, t, s]
           mn.psiAB[sc, t, s] <- mn.psiAB[1, t, s]
           mn.psiBA[sc, t, s] <- mn.psiBA[1, t, s]
@@ -393,29 +385,29 @@ mycode <- nimbleCode(
           mn.pB[sc, t, s] <- mn.pB[1, t, s]
         }
       }}
-    
+
     for (i in 1:nind){
       for (t in 1:(nyr-1)){
         #Survival
-        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + 
+        logit(phiFY[i,t]) <- eta[1, site[i,t],t] +
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eta[2, site[i,t],t] + 
+        logit(phiA[i,t]) <- eta[2, site[i,t],t] +
           lmus[2, site[i,t]] #+  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eta[3, site[i,t],t] +  
-          lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
+        logit(phiB[i,t]) <- eta[3, site[i,t],t] +
+          lmus[3, site[i,t]] + betas[2]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] +  
+        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] +
           lmus[4, site[i,t]] #+ betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + 
-          lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
-        logit(psiBA[i,t]) <-  
+        logit(psiAB[i,t]) <- eta[5, site[i,t],t] +
+          lmus[5, site[i,t]] + betas[3]*hacked[i] # nonbreeder to breeder
+        logit(psiBA[i,t]) <-
           lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eta[7, site[i,t],t] + 
-          lmus[7, site[i,t]] + betas[7]*hacked[i] +
+        logit(pA[i,t]) <- eta[7, site[i,t],t] +
+          lmus[7, site[i,t]] + betas[4]*hacked[i] +
           deltas[5]*effort2[t, site[i,t]] + deltas[6]*effort2[t, site[i,t]]^2 # resight of nonbreeders
-        logit(pB[i,t]) <- eta[8, site[i,t],t] + 
-          lmus[8, site[i,t]] + #betas[8]*hacked[i] + 
+        logit(pB[i,t]) <- eta[8, site[i,t],t] +
+          lmus[8, site[i,t]] + #betas[8]*hacked[i] +
           deltas[7]*effort2[t, site[i,t]] + deltas[8]*effort2[t, site[i,t]]^2 # resight of breeders
       }#t
     }#i
@@ -451,73 +443,73 @@ mycode <- nimbleCode(
           mn.phiA1[sc, t, s] <- ilogit( eta[2, s, t] + 
                                           lmus[2, s] ) + surv.diff[sc, 2, s]
           mn.phiB1[sc, t, s] <- ilogit( eta[3, s, t] +  
-                                          lmus[3, s] + betas[3]*perc.hacked.5yr[sc, t, s] ) + # change perc.hacked to zero at LH bc no birds translocated there
+                                          lmus[3, s] + betas[2]*perc.hacked.5yr[sc, t, s] ) + # change perc.hacked to zero at LH bc no birds translocated there
             surv.diff[sc, 3, s]
           
           #Recruitment
           logit( mn.psiFYB[sc, t, s] ) <- eta[4, s, t] +  
             lmus[4, s]    # first year to breeder
           logit( mn.psiAB[sc, t, s] ) <- eta[5, s, t] +  # nonbreeder to breeder
-            lmus[5, s] + betas[5]*perc.hacked.5yr[sc, t, s] # change perc.hacked to zero at LH bc no birds translocated there
+            lmus[5, s] + betas[3]*perc.hacked.5yr[sc, t, s] # change perc.hacked to zero at LH bc no birds translocated there
           logit( mn.psiBA[sc, t, s] ) <- 
             lmus[6, s]  # breeder to nonbreeder
           #Re-encounter
-          logit( mn.pA[sc, t, s] ) <- eta[7, s, t] + 
-            lmus[7, s] + betas[7]*perc.hacked.5yr[sc, t, s] # resight of nonbreeders
-          logit( mn.pB[sc, t, s] ) <- eta[8, s, t] +  
+          logit( mn.pA[sc, t, s] ) <- eta[7, s, t] +
+            lmus[7, s] + betas[4]*perc.hacked.5yr[sc, t, s] # resight of nonbreeders
+          logit( mn.pB[sc, t, s] ) <- eta[8, s, t] +
             lmus[8, s]  # resight of breeders
         } # s
       } # t
     } # sc
     
     # Define state-transition and observation matrices
-    for (i in 1:nind){  
+    for (i in 1:nind){
       # Define probabilities of state S(t+1) given S(t)
       for (t in first[i]:(nyr-1)){
         ps[1,i,t,1] <- 0
-        ps[1,i,t,2] <- phiFY[i,t] * (1-psiFYB[i,t]) 
+        ps[1,i,t,2] <- phiFY[i,t] * (1-psiFYB[i,t])
         ps[1,i,t,3] <- phiFY[i,t] * psiFYB[i,t]
         ps[1,i,t,4] <- (1-phiFY[i,t])
-        
+
         ps[2,i,t,1] <- 0
         ps[2,i,t,2] <- phiA[i,t] * (1-psiAB[i,t])
         ps[2,i,t,3] <- phiA[i,t] * psiAB[i,t]
         ps[2,i,t,4] <- (1-phiA[i,t])
-        
+
         ps[3,i,t,1] <- 0
         ps[3,i,t,2] <- phiB[i,t] * psiBA[i,t]
         ps[3,i,t,3] <- phiB[i,t] * (1-psiBA[i,t])
         ps[3,i,t,4] <- (1-phiB[i,t])
-        
+
         ps[4,i,t,1] <- 0
         ps[4,i,t,2] <- 0
         ps[4,i,t,3] <- 0
         ps[4,i,t,4] <- 1
-        
+
         # Define probabilities of O(t) given S(t)
-        po[1,i,t,1] <- 1 
+        po[1,i,t,1] <- 1
         po[1,i,t,2] <- 0
         po[1,i,t,3] <- 0
         po[1,i,t,4] <- 0
-        
+
         po[2,i,t,1] <- 0
         po[2,i,t,2] <- pA[i,t]
         po[2,i,t,3] <- 0
         po[2,i,t,4] <- (1-pA[i,t])
-        
+
         po[3,i,t,1] <- 0
         po[3,i,t,2] <- 0
         po[3,i,t,3] <- pB[i,t]
         po[3,i,t,4] <- (1-pB[i,t])
-        
+
         po[4,i,t,1] <- 0
         po[4,i,t,2] <- 0
         po[4,i,t,3] <- 0
         po[4,i,t,4] <- 1
       } #t
     } #i
-    
-    # Likelihood 
+
+    # Likelihood
     for (i in 1:nind){
       # Define latent state at first capture
       z[i,first[i]] <- y[i,first[i]]
@@ -531,17 +523,13 @@ mycode <- nimbleCode(
   } )
 
 #**********************
-#* Function to run model in NIMBLE
+#* Run model in NIMBLE
 #**********************
-run_pva <- function(info, datl, constl, code){
-  library('nimble')
-  library('coda')
-  
   params <- c(
     # pop growth 
     "lambda",
     # prod
-    "lmu.prod", "gamma", "rr", "mn.prod", 
+    "lmu.prod", "gamma",  "mn.prod", "rr", 
     # survival 
     "mus", "lmus", "betas", "deltas",
     # abundance
@@ -558,14 +546,11 @@ run_pva <- function(info, datl, constl, code){
     # "perc.hacked.5yr", "perc.hacked", "num.hacked", "perc.treat",
     # "numer.perc.treat", "denom.perc.treat"
   )
-  n.chains=1; n.thin=1; n.iter=50; n.burnin=25
-  #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-  n.chains=1; n.thin=100; n.iter=300000; n.burnin=200000
   
-  mod <- nimbleModel(code, 
+  mod <- nimbleModel(mycode, 
                      constants = constl, 
                      data = datl, 
-                     inits = info$inits, 
+                     inits = par_info_pva[[1]]$inits, 
                      buildDerivs = FALSE,
                      calculate=T 
   ) 
@@ -577,29 +562,69 @@ run_pva <- function(info, datl, constl, code){
   # Add posterior iterations from the IPM as prior samples for the PVA,
   # So we can simulate from the posterior produced 
   # by the IPM. This way parameters have already converged.
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'Ustar', type = 'prior_samples', samples = outp$Ustar)
-  confhmc$addSampler(target = 'lmu.prod', type = 'prior_samples', samples = outp$lmu.prod)
-  confhmc$addSampler(target = 'rr', type = 'prior_samples', samples = outp$rr)
-  confhmc$addSampler(target = 'gamma', type = 'prior_samples', samples = outp$gamma)
-  confhmc$addSampler(target = 'lmus', type = 'prior_samples', samples = outp$lmus)
-  confhmc$addSampler(target = 'betas', type = 'prior_samples', samples = outp$betas)
-  confhmc$addSampler(target = 'deltas', type = 'prior_samples', samples = outp$deltas)
-  confhmc$addSampler(target = 'r', type = 'prior_samples', samples = outp$r)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
+  out2 <- rbind(out[[1]], out[[2]], out[[3]], out[[4]]) # omit chain 5, convergence issues
+  outp <- MCMCpstr(out[-5], type="chains")
   
+  subs <- grepl('sds', colnames(out2)) # post are my posterior iterations as rows and nodes (sds[1:3]) as columns.
+  sds.p <- out2[ ,subs] # subset to only sds
+  confhmc$addSampler(target = colnames(sds.p), type = 'prior_samples', samples = sds.p)
+  confhmc$getSamplers('sds')
+  
+  subs <- grepl('Ustar', colnames(out2))
+  Ustar.p <- out2[,subs]
+  confhmc$addSampler(target = colnames(Ustar.p), type = 'prior_samples', samples = Ustar.p)
+  confhmc$getSamplers('Ustar')
+  
+  confhmc$addSampler(target = 'lmu.prod', type = 'prior_samples', samples = t(outp$lmu.prod) )
+  confhmc$getSamplers('lmu.prod')
+  
+  confhmc$addSampler(target = 'rr', type = 'prior_samples', samples = outp$rr[1,] )
+  confhmc$getSamplers('rr')
+  
+  confhmc$addSampler(target = 'gamma', type = 'prior_samples', samples = outp$gamma[1,] )
+  confhmc$getSamplers('gamma')
+  
+  subs <- grepl('mus', colnames(out2) )  
+  mus.p <- out2[,subs]
+  subs2 <- grepl('lmus', colnames(mus.p) )
+  mus.p <- mus.p[,!subs2]
+  confhmc$addSampler(target = colnames(mus.p), type = 'prior_samples', samples = mus.p)
+  confhmc$getSamplers('mus')
+  
+  # Some betas are dropped from the PVA, though there are 8 in the IPM, only 4 in PVA
+  # betas[, c(1,3,5,7)] in IPM correspond to betas[, 1:4] in PVA
+  confhmc$addSampler(target = paste0('betas[', 1:4, ']'), type = 'prior_samples', samples = t(outp$betas)[, c(1,3,5,7)] )
+  confhmc$getSamplers('betas')
+  
+  confhmc$addSampler(target = rownames(outp$deltas), type = 'prior_samples', samples = t(outp$deltas) )
+  confhmc$getSamplers('deltas')
+
+  confhmc$addSampler(target = 'r', type = 'prior_samples', samples = outp$r[1,])
+  confhmc$getSamplers('r')
+  
+  subs <- grepl('N[[]', colnames(out2))
+  N.p <- out2[,subs]
+  # Add an extra dimension for scenarios
+  Ncols <- colnames(N.p)
+  pos1 <- len <- c()
+  for (i in 1:length(Ncols)) {
+    pos1[i] <- gregexpr(pattern =',', Ncols[[i]] )[[1]][1]
+    len[i] <- nchar(Ncols[[i]])
+  }
+  colnames(N.p) <- paste0('N[1, ', substr(Ncols, pos1-1, len))
+  confhmc$addSampler(target = colnames(N.p), type = 'prior_samples', samples = N.p)
+  
+  subs <- grepl('z.score', colnames(out2) )  
+  z.score.p <- out2[,subs]
+  confhmc$addSampler(target = colnames(z.score.p), type = 'prior_samples', samples = z.score.p)
   
   hmc <- buildMCMC(confhmc)
   chmc <- compileNimble(hmc, project = mod, 
                         resetFunctions = TRUE,
                         showCompilerOutput = TRUE)
+  
+  n.chains=1; n.thin=1; n.iter=50; n.burnin=25
+  #n.chains=1; n.thin=1; n.iter=2000; n.burnin=0
   
   post <- runMCMC(chmc,
                   niter = n.iter, 
@@ -607,23 +632,8 @@ run_pva <- function(info, datl, constl, code){
                   nchains = n.chains,
                   thin = n.thin,
                   samplesAsCodaMCMC = T, 
-                  setSeed = info$seed)
-  
-  return(post)
-} # run_pva function end
+                  setSeed = par_info_pva[[1]]$seed)
 
-#*****************
-#* Run chains in parallel
-#*****************
-
-this_cluster <- makeCluster(cpus)
-post <- parLapply(cl = this_cluster, 
-                  X = par_info_pva[1:cpus], 
-                  fun = run_pva, 
-                  datl = datl, 
-                  constl = constl, 
-                  code = mycode)
-stopCluster(this_cluster)
 save(post, mycode, seeds, cpus,
      file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_shortrun.rdata")
 # save(post, mycode, seeds, cpus,

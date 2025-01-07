@@ -1,3 +1,4 @@
+
 ## ---- pva --------
 library('nimble')
 library('parallel')
@@ -15,6 +16,7 @@ library ("MCMCvis")
 #* Set data to reflect PVA scenarios
 #**********************
 cpus <- 5 # number of processors
+
 constl$K <- 50 # number of future years
 constl$SC <- 45 # number of PVA scenarios
 datl$constraint_data <- rbind(datl$constraint_data, array(1, dim=c(constl$K,2)) ) # to help constrain FYs born + hacked to be positive
@@ -40,8 +42,7 @@ for (sc in 1:constl$SC){
 constl$hacked.counts <- hacked.counts
 
 #**********************
-#* Specify initial values
-#* from posterior of IPM
+#* Specify priors taken from posterior of IPM
 #**********************
 #* This helps ensure that all chains run
 # Identify chains with NAs that failed to initialize
@@ -55,6 +56,9 @@ outp <- MCMCpstr(out, type="chains")
 !NAlist
 
 Ni.func <- function (){
+  # randomly select inits from ones that work
+  # Ni <- outp$N[1:7,1:constl$nyr,1:2,
+  #              sample(seq(1, 10000, by=100), 1, replace = F)]
   # take the means of the posterior for inits
   Ni <- apply(outp$N, c(1,2,3), mean) |> round()
   Ni.pva <- array(NA, dim=c(constl$SC, dim(Ni)+c(0,constl$K,0)))
@@ -96,6 +100,31 @@ par_info_pva <- list()
 for (i in 1:cpus){
   par_info_pva[[i]] <- list(seed=seeds[i], inits = inits.func.pva())
 }
+
+#**********************
+#* Extract IPM estimates
+#**********************
+constl$betas.mn <- apply(outp$betas, 1, mean)
+constl$deltas.mn <- apply(outp$deltas, 1, mean)
+constl$gamma.mn <- apply(outp$gamma, 1, mean)
+constl$lmus.mn <- apply(outp$lmus, c(1,2), mean)
+constl$lmu.prod.mn <- apply(outp$lmu.prod, 1, mean)
+constl$zscore.mn <- apply(outp$z.score, c(1,2,3), mean)
+constl$sds.mn <- apply(outp$sds, 1, mean)
+constl$rr.mn <- apply(outp$rr, 1, mean)
+constl$r.mn <- apply(outp$r, 1, mean)
+constl$N1.mn <- apply(outp$N[,1,,], c(1,2), mean)
+
+constl$betas.sd <- apply(outp$betas, 1, sd)
+constl$deltas.sd <- apply(outp$deltas, 1, sd)
+constl$gamma.sd <- apply(outp$gamma, 1, sd)
+constl$lmus.sd <- apply(outp$lmus, c(1,2), sd)
+constl$lmu.prod.sd <- apply(outp$lmu.prod, 1, sd)
+constl$zscore.sd <- apply(outp$z.score, c(1,2,3), sd)
+constl$sds.sd <- apply(outp$sds, 1, sd)
+constl$rr.sd <- apply(outp$rr, 1, sd)
+constl$r.sd <- apply(outp$r, 1, sd)
+constl$N1.sd <- apply(outp$N[,1,,], c(1,2), sd)
 
 #**********************
 #* Parameter descriptions
@@ -147,26 +176,25 @@ mycode <- nimbleCode(
     ###################################################
     # survival, recruitment, and detection can be correlated
     for (k in 1:8){ 
-      betas[k] ~ dnorm(0, sd=20)  # prior for coefficients
-      deltas[k] ~ dnorm(0, sd=10)
+      betas[k] ~ dnorm(betas.mn[k], sd = betas.sd[k])  # prior for coefficients
+      deltas[k] ~ dnorm(deltas.mn[k], sd = deltas.sd[k])
     } # k
     
     for (j in 1:8){
       for (s in 1:nsite){
-        lmus[j,s] <- logit(mus[j,s])
-        mus[j,s] ~ dbeta(1,1) # prior for means
+        lmus[j,s] ~ dnorm(lmus.mn[j,s], lmus.sd[j,s])
       }}     # m population #s sex #h hacked
     
     # Temporal random effects and correlations between sites
     # Non-centered parameterization of the multivariate normal distribution to improve convergence
-    for (jj in 1:p){ sds[jj] ~ dexp(1) }# prior for temporal variation
+    for (jj in 1:p){ sds[jj] ~ T(dnorm(sds.mn[jj], sd=sds.sd[jj]),0, ) }# prior for temporal variation
     R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
     Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
     for (t in 1:(nyr+K)){ # survival params only have nyr-1, no problem to simulate from however
       for (s in 1:nsite){
         eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
         for(j in 1:p){
-          z.score[j,s,t] ~ dnorm(0, sd=1)  # z-scores
+          z.score[j,s,t] ~ dnorm(z.score.mn[j,s,t], sd= z.score.sd[j,s,t])  # z-scores
         } # j
       } } # s t 
     
@@ -194,10 +222,10 @@ mycode <- nimbleCode(
     ###############################
     # Priors 
     for (s in 1:nsite){
-      lmu.prod[s] ~ dnorm(0, sd=5)
+      lmu.prod[s] ~ dnorm(lmu.prod.mn[s], sd=lmu.prod.sd[s])
     } # s
-    gamma ~ dnorm(0, sd=10)
-    rr ~ dexp(0.05)
+    gamma ~ dnorm(gamma.mn, sd= gamma.sd)
+    rr ~ T(dnorm(rr.mn, rr.sd),0,)
     
     # Productivity likelihood       
     for (k in 1:npairsobs){
@@ -336,7 +364,7 @@ mycode <- nimbleCode(
       countsFY[t, 2] ~ dnegbin(pp[t], r) # first year females, includes translocated/hacked
       pp[t] <- r/(r+(lamFY[1, t, 2] ))
     } # t
-    r ~ dexp(0.05)
+    r ~ T(dnorm(r.mn, r.sd),0, )
     
     # Future projections of counts 
     for(sc in 1:SC){
@@ -558,7 +586,7 @@ run_pva <- function(info, datl, constl, code){
     # "perc.hacked.5yr", "perc.hacked", "num.hacked", "perc.treat",
     # "numer.perc.treat", "denom.perc.treat"
   )
-  n.chains=1; n.thin=1; n.iter=50; n.burnin=25
+  #n.chains=1; n.thin=1; n.iter=50; n.burnin=25
   #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
   n.chains=1; n.thin=100; n.iter=300000; n.burnin=200000
   
@@ -573,29 +601,6 @@ run_pva <- function(info, datl, constl, code){
   cmod <- compileNimble(mod, showCompilerOutput = TRUE)
   confhmc <- configureMCMC(mod)
   confhmc$setMonitors(params)
-  
-  # Add posterior iterations from the IPM as prior samples for the PVA,
-  # So we can simulate from the posterior produced 
-  # by the IPM. This way parameters have already converged.
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'Ustar', type = 'prior_samples', samples = outp$Ustar)
-  confhmc$addSampler(target = 'lmu.prod', type = 'prior_samples', samples = outp$lmu.prod)
-  confhmc$addSampler(target = 'rr', type = 'prior_samples', samples = outp$rr)
-  confhmc$addSampler(target = 'gamma', type = 'prior_samples', samples = outp$gamma)
-  confhmc$addSampler(target = 'lmus', type = 'prior_samples', samples = outp$lmus)
-  confhmc$addSampler(target = 'betas', type = 'prior_samples', samples = outp$betas)
-  confhmc$addSampler(target = 'deltas', type = 'prior_samples', samples = outp$deltas)
-  confhmc$addSampler(target = 'r', type = 'prior_samples', samples = outp$r)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  
-  
   hmc <- buildMCMC(confhmc)
   chmc <- compileNimble(hmc, project = mod, 
                         resetFunctions = TRUE,
