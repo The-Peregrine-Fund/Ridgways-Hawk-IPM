@@ -2,8 +2,8 @@
 library('nimble')
 library('parallel')
 library ('coda')
-load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
-#load("data/data.rdata")
+#load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+load("data/data.rdata")
 cpus <- 5
 
 #**********************
@@ -69,10 +69,8 @@ mycode <- nimbleCode(
     # Temporal random effects and correlations between sites
     # Non-centered parameterization of the multivariate normal distribution to improve convergence
     for (jj in 1:p){ sds[jj] ~ dexp(1) }# prior for temporal variation
-    # estimated using the multivariate normal distribution
     R[1:p,1:p] <- t(Ustar[1:p,1:p]) %*% Ustar[1:p,1:p] # calculate rhos, correlation coefficients
     Ustar[1:p,1:p] ~ dlkj_corr_cholesky(eta=1.1, p=p) # Ustar is the Cholesky decomposition of the correlation matrix
-    # multivariate normal for temporal variance
     for (t in 1:nyr){ # survival params only have nyr-1, no problem to simulate from however
       for (s in 1:nsite){
         eta[1:p,s,t] <- diag(sds[1:p]) %*% t(Ustar[1:p,1:p]) %*% z.score[1:p,s,t]
@@ -173,12 +171,11 @@ mycode <- nimbleCode(
         NAD[t, s] <- NF[t, s] + NB[t, s] # number of adults
         Ntot[t, s] <- sum(N[1:7, t, s]) # total number of females
         log(lamAD[t, s]) <- log(NAD[t, s]) + deltas[1]*effort2[t, s] + deltas[2]*effort2[t, s]^2  
-        #deltas[9]*effort.shift[t,s]
         log(lamFY[t, s]) <- log(N[1, t, s]) + deltas[3]*effort2[t, s] + deltas[4]*effort2[t, s]^2
       }# s
       # First-years at different sites have different distributions
       # for better model fit
-      countsFY[t, 1] ~ dpois(lamFY[t, 1]) # doesn't have any zeroes so poisson
+      countsFY[t, 1] ~ dpois(lamFY[t, 1]) # doesn't have any zeroes so poisson fits
       countsFY[t, 2] ~ dnegbin(pp[t], r) # first year females, includes translocated/hacked
       pp[t] <- r/(r+(lamFY[t, 2] ))
     } # t
@@ -267,24 +264,24 @@ mycode <- nimbleCode(
     for (i in 1:nind){
       for (t in 1:nyr){
         #Survival
-        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + # eps[1,t] + 
+        logit(phiFY[i,t]) <- eta[1, site[i,t],t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
-        logit(phiA[i,t]) <- eta[2, site[i,t],t] + #eps[2,t] + 
+        logit(phiA[i,t]) <- eta[2, site[i,t],t] +  
           lmus[2, site[i,t]] #+  betas[2]*hacked[i] # nonbreeder
-        logit(phiB[i,t]) <- eta[3, site[i,t],t] + #eps[3,t] + 
+        logit(phiB[i,t]) <- eta[3, site[i,t],t] +  
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
-        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] + #eps[4,t] + 
+        logit(psiFYB[i,t]) <- eta[4, site[i,t],t] +  
           lmus[4, site[i,t]] + betas[4]*hacked[i] # first year to breeder
-        logit(psiAB[i,t]) <- eta[5, site[i,t],t] + #eps[5,t] + 
+        logit(psiAB[i,t]) <- eta[5, site[i,t],t] +  
           lmus[5, site[i,t]] + betas[5]*hacked[i] # nonbreeder to breeder
-        logit(psiBA[i,t]) <- #eta[6, site[i,t],t] + eps[6,t] + 
-          lmus[6, site[i,t]] #+ betas[6]*hacked[i] # breeder to nonbreeder
+        logit(psiBA[i,t]) <-  
+          lmus[6, site[i,t]] # breeder to nonbreeder
         #Re-encounter
-        logit(pA[i,t]) <- eta[7, site[i,t],t] + #eps[7,t] + 
+        logit(pA[i,t]) <- eta[7, site[i,t],t] + 
           lmus[7, site[i,t]] + betas[7]*hacked[i] +
           deltas[5]*effort2[t, site[i,t]] + deltas[6]*effort2[t, site[i,t]]^2# resight of nonbreeders
-        logit(pB[i,t]) <- eta[8, site[i,t],t] + #eps[8,t] + 
+        logit(pB[i,t]) <- eta[8, site[i,t],t] + 
           lmus[8, site[i,t]] + betas[8]*hacked[i] + 
           deltas[7]*effort2[t, site[i,t]] + deltas[8]*effort2[t, site[i,t]]^2# resight of breeders
       }#t
@@ -356,19 +353,7 @@ mycode <- nimbleCode(
 run_ipm <- function(info, datl, constl, code){
   library('nimble')
   library('coda')
-  # helper function for multivariate normal
-  uppertri_mult_diag <- nimbleFunction(
-    run = function(mat = double(2), vec = double(1)) {
-      returnType(double(2))
-      p <- length(vec)
-      out <- matrix(nrow = p, ncol = p, init = FALSE)
-      for(i in 1:p){
-        out[ ,i] <- mat[ ,i] * vec[i]
-      }
-      return(out)
-    })
-  assign('uppertri_mult_diag', uppertri_mult_diag, envir = .GlobalEnv)
-  
+
   params <- c(
     # pop growth 
     "lambda",
@@ -393,10 +378,8 @@ run_ipm <- function(info, datl, constl, code){
     "tvm.obs", "tvm.rep",
     "tturn.obs", "tturn.rep"
   )
-  #n.chains=1; n.thin=1; n.iter=50; n.burnin=10
-  #n.chains=1; n.thin=200; n.iter=800000; n.burnin=600000
-  n.chains=1; n.thin=5; n.iter=10000; n.burnin=5000
-  # n.chains=1; n.thin=100; n.iter=100000; n.burnin=50000
+
+  n.chains=1; n.thin=100; n.iter=100000; n.burnin=50000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -438,7 +421,4 @@ post <- parLapply(cl = this_cluster,
 stopCluster(this_cluster)
 
 # save(post, mycode,
-#      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
-
-save(post, mycode,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun_nohack.rdata")
+#      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm.rdata")

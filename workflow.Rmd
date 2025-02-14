@@ -33,18 +33,9 @@ The full workflow below is visible as a html website at:
 <https://the-peregrine-fund.github.io/Ridgways-Hawk-IPM/>.
 
 -----------------------------------------------------------------------   
-# 1. Code for Integrated Population Model (IPM)
+# 1. Integrated Population Model (IPM)
 
 ## 1.1 Model Code 
-### 1.1.1 Submodels without Integration
-We used a model without integration to obtain adequate initial values and reduce the chance of chains breaking during subsequent runs. 
-```{r, include=FALSE, cache=FALSE, warning=FALSE }
-knitr::read_chunk('R/02-ipm-simp.R')
-```
-```{r,ipm-simp, eval=FALSE, warning=FALSE, message=FALSE}
-```
-
-### 1.1.2 Integrated Population Model
 Code for the Integrated Population Model. 
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/03-ipm.R')
@@ -52,7 +43,8 @@ knitr::read_chunk('R/03-ipm.R')
 ```{r,ipm, eval=FALSE, warning=FALSE, message=FALSE}
 ```
 
-## 1.2 IPM Results- Figures and Tables
+## 1.2 Results- Figures and Tables
+Simple summary statistics 
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/05-postprocess.R')
 ```
@@ -60,6 +52,9 @@ knitr::read_chunk('R/05-postprocess.R')
 ```
 
 ### 1.2.1 Population Trends and Structure 
+```{r,trends, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 4)}
+```
+
 ```{r,popstructure, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(6, 8)}
 ```
 
@@ -71,7 +66,7 @@ knitr::read_chunk('R/05-postprocess.R')
 ```{r,productivity, eval=TRUE, warning=FALSE, message=FALSE}
 ```
 
-### 1.2.4 Correlations Among Demographic Rates and Detection
+### 1.2.4 Correlations Among Parameters
 R is the correlation coefficent between rates. Indices for R are demographics and detection parameters in both dimensions. For example, R[1,2] is the correlation coefficient between first-year survival and nonbreeder survival.   
 1. First-year Survival  
 2. Nonbreeder Survival   
@@ -94,7 +89,8 @@ R is the correlation coefficent between rates. Indices for R are demographics an
 ```{r,cors1, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
 ```
 
-### 1.2.7 Population Growth Rates and Contributions from Demographics
+### 1.2.7 Transient Life Table Response Experiments (tLTREs)  
+Population Growth Rates and Contributions from Demographics
 ```{r,contributions, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(8, 6)}
 ```
 
@@ -108,24 +104,31 @@ knitr::read_chunk('R/04-pva.R')
 ```{r,pva, eval=FALSE, warning=FALSE, message=FALSE}
 ```
 
-## 2.2 PVA Results
+## 2.2 PVA Projections
 ```{r, include=FALSE, cache=FALSE, warning=FALSE }
 knitr::read_chunk('R/05-postprocess.R')
 ```
 
-### 2.2.1 Extinction Projections Over Time- Lines
+### 2.2.1 Local Extinction Probability 
 ```{r,pva_ext1, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
 ```
 
-### 2.2.2 Extinction Projections for 2073- Heatmap
-```{r,pva_ext2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
+```{r,pva_ext2, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 8)}
 ```
 
-### 2.2.3 Abundance Projections
+### 2.2.3 Abundance 
 ```{r,pva_abund, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
 ```
 
-### 2.2.4 Time to Extinction
+### 2.2.4 Percent Change in Abundance
+```{r,pva_pc, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 8)}
+```
+
+### 2.2.5 Probability of Decline in Abundance
+```{r,pva_pd, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 8)}
+```
+
+### 2.2.6 Time to Extinction
 ```{r,pva_tt_ext, eval=TRUE, warning=FALSE, message=FALSE, fig.dim = c(10, 12)}
 ```
 

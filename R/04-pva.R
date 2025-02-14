@@ -3,9 +3,9 @@ library('nimble')
 library('parallel')
 library ('coda')
 
-load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
-source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
-load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
+# load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+# source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
+# load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 
 load("C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//ipm_longrun.rdata")
 load("data//data.rdata")
@@ -554,13 +554,10 @@ run_pva <- function(info, datl, constl, code){
     'mn.psiFYB', 'mn.psiAB', 'mn.psiBA',
     'mn.pA', 'mn.pB',
     # pva
-    "extinct", "extinctAD", "extinctB"#,
-    # "perc.hacked.5yr", "perc.hacked", "num.hacked", "perc.treat",
-    # "numer.perc.treat", "denom.perc.treat"
+    "extinct", "extinctAD", "extinctB"
   )
-  n.chains=1; n.thin=1; n.iter=50; n.burnin=25
-  #n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
-  n.chains=1; n.thin=100; n.iter=300000; n.burnin=200000
+  #n.chains=1; n.thin=1; n.iter=50; n.burnin=25
+  n.chains=1; n.thin=50; n.iter=100000; n.burnin=50000
   
   mod <- nimbleModel(code, 
                      constants = constl, 
@@ -573,29 +570,6 @@ run_pva <- function(info, datl, constl, code){
   cmod <- compileNimble(mod, showCompilerOutput = TRUE)
   confhmc <- configureMCMC(mod)
   confhmc$setMonitors(params)
-  
-  # Add posterior iterations from the IPM as prior samples for the PVA,
-  # So we can simulate from the posterior produced 
-  # by the IPM. This way parameters have already converged.
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'Ustar', type = 'prior_samples', samples = outp$Ustar)
-  confhmc$addSampler(target = 'lmu.prod', type = 'prior_samples', samples = outp$lmu.prod)
-  confhmc$addSampler(target = 'rr', type = 'prior_samples', samples = outp$rr)
-  confhmc$addSampler(target = 'gamma', type = 'prior_samples', samples = outp$gamma)
-  confhmc$addSampler(target = 'lmus', type = 'prior_samples', samples = outp$lmus)
-  confhmc$addSampler(target = 'betas', type = 'prior_samples', samples = outp$betas)
-  confhmc$addSampler(target = 'deltas', type = 'prior_samples', samples = outp$deltas)
-  confhmc$addSampler(target = 'r', type = 'prior_samples', samples = outp$r)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  confhmc$addSampler(target = 'sds', type = 'prior_samples', samples = outp$sds)
-  
-  
   hmc <- buildMCMC(confhmc)
   chmc <- compileNimble(hmc, project = mod, 
                         resetFunctions = TRUE,
@@ -615,7 +589,7 @@ run_pva <- function(info, datl, constl, code){
 #*****************
 #* Run chains in parallel
 #*****************
-
+# WARNING: This takes 12 days to run parallel on an HPC
 this_cluster <- makeCluster(cpus)
 post <- parLapply(cl = this_cluster, 
                   X = par_info_pva[1:cpus], 
@@ -624,7 +598,5 @@ post <- parLapply(cl = this_cluster,
                   constl = constl, 
                   code = mycode)
 stopCluster(this_cluster)
-save(post, mycode, seeds, cpus,
-     file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_shortrun.rdata")
 # save(post, mycode, seeds, cpus,
-#      file="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//pva_survival_longrun.rdata")
+#      file="/bsuscratch/brianrolek/riha_ipm/outputs/pva_shortrun.rdata")
