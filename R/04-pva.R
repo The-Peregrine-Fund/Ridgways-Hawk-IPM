@@ -7,6 +7,7 @@ library ('coda')
 # source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
 # load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 
+# load IPM results to get good inits
 load("C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//ipm_longrun.rdata")
 load("data//data.rdata")
 library ("MCMCvis")
@@ -82,8 +83,6 @@ inits.func.pva <- function (){
     deltas = apply(outp$deltas, 1, mean),
     sds =  apply(outp$sds, 1, mean),
     Ustar = u2,
-    # counts
-    countsAdults= matrix(c(374, 335, 305, 295, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
     r = mean(outp$r),
     N = Ni.func()
   )}
