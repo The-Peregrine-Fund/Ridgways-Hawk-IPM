@@ -9,6 +9,7 @@ library ('ggpubr')
 library('viridis')
 library ('HDInterval')
 library ('abind')
+library ('ggimage')
 load("data/data.rdata")
 load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
 out <- lapply(post[1:4], as.mcmc) # omit chain 5, causing lack of convergence in 1 param
@@ -129,7 +130,12 @@ df.counts$Site <- ifelse(df.counts$Site_ab=="LHNP", "Los Haitises", "Punta Cana"
 df.counts.all <- data.frame(Year=2011:2023, Site_ab="Both sites", Count=counts.tot[,1] + counts.tot[,2], Site="Both sites" )
 df.counts <- rbind(df.counts, df.counts.all)
 
-p1 <- ggplot() + theme_minimal(base_size=14) + 
+p1 <- ggplot() + theme_minimal(base_size=14) +
+      # geom_image(
+      # data=data.frame(Year = 2017.5, Abundance = 120, Site="Los Haitises"), 
+      # aes(Year, Abundance, 
+      #   image = "C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\pics\\RIHA head.png"),
+      # size = 0.5) +
   geom_line(data=lN, aes(x=Year, y=Abundance, group=Iter), 
             color="gray30", linewidth=0.1, alpha=0.01 ) +
   stat_summary(data=lN, aes(x=Year, y=Abundance), 
@@ -144,13 +150,14 @@ p1 <- ggplot() + theme_minimal(base_size=14) +
   geom_line(data=df.counts, aes(x=Year, y=Count), 
             col="black", linewidth=1, linetype=2 ) +
   facet_wrap("Site", scales="free_y") +
-  xlab("Year") + ylab("Number")
+  xlab("Year") + ylab("Number") 
+  
 p1
 
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance and counts.tiff",
-#        plot=p1,
-#        device="tiff",
-#        width=9, height=4, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Abundance and counts.tiff",
+       plot=p1,
+       device="tiff",
+       width=9, height=4, dpi=300)
 
 #### ----popstructure -----
 # Plot life stage structure
@@ -369,6 +376,13 @@ lprod <- rbind(lf,lf.pred)
 lprod$Treatment <- factor(lprod$Treatment, levels=c('Untreated', 'Treated'))
 
 p.prod <- ggplot(lprod, aes(x=Treatment, y=Productivity) ) +
+          # geom_image( data=data.frame(Treatment = "Untreated", 
+          #                             Productivity = 1.2, 
+          #                             Site="Punta Cana"), 
+          #             aes(Treatment, Productivity, 
+          #                 image = "C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\pics\\Ridgway's Hawk nestlings.JPG"),
+          #             size = 0.5, 
+          #             position="nudge", x=1.5, y=1.2) +
             stat_pointinterval(point_interval=median_hdci, .width = c(.95, .80), expand=T) +
             facet_wrap("Site") +
             theme_bw(base_size=14) +
@@ -379,10 +393,10 @@ p.prod <- ggplot(lprod, aes(x=Treatment, y=Productivity) ) +
                                minor_breaks = seq(0, 1.5, by = 0.1))
 
 p.prod
-# ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Fecundity_treatment_ggplot.tiff",
-#        plot=p.prod,
-#        device="tiff",
-#        width=4, height=3, dpi=300)
+ggsave(filename="C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//Fecundity_treatment_ggplot.tiff",
+       plot=p.prod,
+       device="tiff",
+       width=4, height=3, dpi=300)
 
 # Calculate probability of direction
 f.diff <- f[1,]-f[2,]
