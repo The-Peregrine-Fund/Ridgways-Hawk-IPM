@@ -1,25 +1,28 @@
 #### ---- setup -------
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
-load("data/data.rdata")
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_short.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_da_longrun_2025_Apr_10.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_dd_longrun_2025_Apr_07.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun_2025_Apr_01.rdata")
+load("data/data-dd.rdata")
 library ('MCMCvis')
 library ('coda')
 library ('ggplot2')
 library('reshape2')
 library('bayestestR')
-out <- lapply(post, as.mcmc)
 
 # Identify chains with NAs that 
 # failed to initialize
 NAlist <- c()
-for (i in 1:length(out)){
-  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+for (i in 1:length(post)){
+  NAlist[i] <- any (is.na(post[[i]][,1:311]) | post[[i]][,1:311]<0)
 }
 # Subset chains to those with good initial values
-out <- out[!NAlist]
-out <- out[1:4] # omit chain 5 bc one parameter causes a convergence failure
+out <- post[!NAlist]
+#out <- out[1:5] # omit chain 5 bc one parameter causes a convergence failure
+!NAlist
 outp <- MCMCpstr(out, type="chains")
 
-!NAlist
+
 #### ---- pltfunction -------
 # default settings for plots 
 plt  <- function(object, params,...) {
@@ -327,6 +330,12 @@ plt(object=out, params="mn.prod",
     xlab = "Year", ylab= "Productivity")
 abline(v=13.5, lwd=2)
 
+#---- densitydependence ----
+# Demographics- Annual Averages
+# Annual averages for integration into the population model
+plt(object=out, params="alphas",
+    main="Coefficients for density dependence")
+
 #### ---- paramests -------
 # Estimates for the survival model 
 # In this order: FY survival, NB survival, B survival, 
@@ -383,12 +392,22 @@ MCMCsummary(out, params = Rs,
             hpd_prob = 0.95, pg0= TRUE,
             func=median, func_name="median")
 
+# Coeffieicents for density dependence
+MCMCsummary(out, params = "alphas", 
+            #exact=TRUE, ISB=FALSE,
+            digits=2, HPD = T, 
+            hpd_prob = 0.95, pg0= TRUE,
+            func=median, func_name="median") |> round (3) 
+
 #### ---- traceplots ------
+out <- post
+outp <- MCMCpstr(out, type="chains")
 MCMCtrace(out, pdf=FALSE, params= "mus", Rhat=TRUE, priors=runif(20000, 0, 1), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "lmu.prod", Rhat=TRUE, priors=rnorm(20000, 0, 5), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "betas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "deltas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "gamma", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
+MCMCtrace(out, pdf=FALSE, params= "alphas", Rhat=TRUE, priors=rnorm(20000, 0, 10), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "sds", Rhat=TRUE, priors=rexp(20000, 1), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "r", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
 MCMCtrace(out, pdf=FALSE, params= "rr", Rhat=TRUE, priors=rexp(20000, 0.05), post_zm=FALSE)
@@ -462,3 +481,4 @@ fit.check(out, ratio=F,
           ind=1,
           lab="Productivity-Neg binomial", jit=300)
 # dev.off()
+

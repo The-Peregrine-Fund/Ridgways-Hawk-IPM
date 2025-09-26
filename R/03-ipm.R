@@ -2,8 +2,8 @@
 library('nimble')
 library('parallel')
 library ('coda')
-#load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
-load("data/data.rdata")
+load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+# load("data/data.rdata")
 cpus <- 5
 
 #**********************
@@ -104,7 +104,6 @@ mycode <- nimbleCode(
       ppp[k] <- rr/(rr+mu.prod[k])
       log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
         gamma*treat.pair[k] + 
-        #eps[9, year.pair[k] ] + 
         eta[9, site.pair[k], year.pair[k] ] 
     } # k
     # Derive yearly productivity for population model
@@ -267,7 +266,7 @@ mycode <- nimbleCode(
         logit(phiFY[i,t]) <- eta[1, site[i,t],t] + 
           lmus[1, site[i,t]] + betas[1]*hacked[i]  # first year
         logit(phiA[i,t]) <- eta[2, site[i,t],t] +  
-          lmus[2, site[i,t]] #+  betas[2]*hacked[i] # nonbreeder
+          lmus[2, site[i,t]] +  betas[2]*hacked[i] # nonbreeder
         logit(phiB[i,t]) <- eta[3, site[i,t],t] +  
           lmus[3, site[i,t]] + betas[3]*hacked[i] # breeder
         #Recruitment
@@ -379,6 +378,7 @@ run_ipm <- function(info, datl, constl, code){
     "tturn.obs", "tturn.rep"
   )
 
+  #n.chains=1; n.thin=1; n.iter=100; n.burnin=50
   n.chains=1; n.thin=100; n.iter=100000; n.burnin=50000
   
   mod <- nimbleModel(code, 
@@ -419,6 +419,9 @@ post <- parLapply(cl = this_cluster,
                   constl = constl, 
                   code = mycode)
 stopCluster(this_cluster)
+
+save(post, mycode,
+     file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun_2025_Apr_03.rdata")
 
 # save(post, mycode,
 #      file="/bsuscratch/brianrolek/riha_ipm/outputs/ipm.rdata")

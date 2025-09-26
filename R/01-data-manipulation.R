@@ -22,9 +22,10 @@ library('readxl')
 library ('dplyr')
 library('ggplot2')
 library ('reshape2')
+library('coda')
 # summaraize field effort
 # for count data
-dfl <- "data\\RIHA data 2011-2023.xlsx"
+dfl <- "data\\RIHA data 2011-2023_updated_2025_Mar_27.xlsx"
 effort.dat <- read_excel(dfl, sheet='effort', na=c('') ) 
 effort.dat$surv.days <- effort.dat$`n surveyors`*effort.dat$`n days`
 effort <- data.frame(Year=2011:2023)
@@ -76,6 +77,7 @@ df$lcode[df$lcode %in% nrs] <- "NR"
 #df$l.code[df$l.code=="None"] <- "NB"
 df$ID <- paste(df$lcode, df$rcode, 
                df$lcol, df$rcol, sep="-")
+df <- df[!is.na(df$ID),]
 
 #**********************
 #* 2. Counts 
@@ -121,33 +123,12 @@ plot(2011:2023, countsFY.all[,1], type="o",
 lines(2011:2023, countsFY.all[,2], type="o", lty=2, pch=2)
 legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
 
-# replot with duplicated bands
-# all NR-NR-NR-NR, NB-NB-NB-NB, and NB-NR-NB-NR
-# where NR means "not recorded" and NB means "not banded"
-# counts.unmarked.all.nd <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$origin)
-# countsFY.all.nd <- counts.marked.all[1,,] + counts.unmarked.all.nd[1,,]
-# # plot FYs
-# plot(2011:2023, countsFY.all.nd[,1], type="o", 
-#      ylab=c("Count of first-years\n(males+females)"), xlab=c("Year"), 
-#      ylim=c(0,max(countsFY.all.nd[,1])))
-# lines(2011:2023, countsFY.all.nd[,2], type="o", lty=2, pch=2)
-# legend(x=2012, y=120, lty=c(1,2), pch=c(1,2), legend=c("LHNP", "PC"))
-# Extract count data from Google Sheet- Adult RIHA per year_location
-# countsAD <- t(matrix(c(72, 190, 235, 250, 196, 210, 250, 268, 288, 268, 296, 276, 340,
-#                        3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
-#                      nrow=2, byrow=TRUE))
 countsAD <- t(matrix(c(72, 190, 235, 250, 
                        196, 210, 250, 268, 288, 268, 296, 276, 340,
                        3, 5, 5, 4, 16, 24, 34, 38, 36, 36, 40, 52, 58), 
                      nrow=2, byrow=TRUE))
 # 'B NB N' - 0= Not seen, 1= Nestling, 2=Nonbreeder, 3= Breeder
 df.marked.max <- df.marked.max[df.marked.max$sex=="Female", ]
-# counts.marked <- table(df.marked.max$Stage, df.marked.max$year.resighted, df.marked.max$current.population)
-# 
-# df.unmarked.nodups <- df.unmarked.nodups[df.unmarked.nodups$sex=="Female",]
-# counts.unmarked <- table(df.unmarked.nodups$Stage, df.unmarked.nodups$year.resighted, df.unmarked.nodups$current.population)
-# dimnames(counts.marked)[[1]] <- c('nestling', 'nonbreeder', 'breeder')
-# dimnames(counts.unmarked)[[1]] <- c('nonbreeder', 'breeder')
 
 # subset to females
 df.all <- df
@@ -165,12 +146,7 @@ df <- df[df$sex=="Female",]
 fyr <- min(df.marked.max$year.resighted, na.rm=T)
 lyr <- max(df.marked.max$year.resighted, na.rm=T)
 nyr <- lyr-fyr+1
-nsite <- length(unique(df$current.population))
-# df.cut <- data.frame(
-#   start = paste0(fyr:(lyr-1), "-07-14"), # cutoffs around first fledging
-#   end = paste0((fyr+1):lyr, "-07-14"),
-#   nms = paste0("Y", fyr:(lyr-1),"_", (fyr+1):lyr) )
-# df.cut$yr_int <- df.cut$start %--% df.cut$end 
+nsite <- length(unique(df$current.population))-1
 
 #**********************
 #* 3. Mark-recapture/resight ----
@@ -223,13 +199,14 @@ dfm <- dfm[cnum2<=2 | keep.grthan2, ]
 # Omit incomplete band IDs
 incomp <- c("NR-NR-Green-NR", "NR-NR-Green-NR")
 dfm <- dfm[!dfm$ID %in% incomp, ]
+dfm <- dfm[!is.na(dfm$ID),]
 
 #Compare with original band assignments
 #ID is ordered as lcode-rcode-lcol-rcol
 #View(dfm[, c("l.code", "r.code", "left.color", "right.color", "ID")])
 # Are there 3 NAs and only an ayudanos band number?
 
-
+# NAs causing different numbers here.
 nind <- length(unique(dfm$ID))
 ind.nu <- sort(unique(dfm$ID))
 
@@ -366,7 +343,7 @@ df.all$prod <- ifelse(df.all$Stage==1, 1,
 prod <- tapply(df.all$prod, list(df.all$territory.name, df.all$year.resighted), sum, na.rm=TRUE)
 table(prod)
 
-df.all$group <- ifelse(df.all$group=="NR", NA, as.numeric(df.all$group) )
+df.all$group <- ifelse( df.all$group=="NR", NA, as.numeric(df.all$group) )
 levels(factor(df.all$group))
 treat <- tapply(df.all$group, list(df.all$territory.name, df.all$year.resighted), max, na.rm=TRUE)
 treat <- ifelse(treat==3, 1, ifelse(treat==1,0,NA))
@@ -380,7 +357,7 @@ lp <- lp[!is.na(lp$fledged) & !is.na(lp$treat),]
 
 lp$nestsuccess <- ifelse(lp$fledged>0, 1, 0) 
 lp$brood <- ifelse(lp$fledged>0, lp$fledged, NA)
-lp$year2 <- lp$year-(min(lp$year)-1)
+lp$year2 <- lp$year-(min(lp$year)-1) 
 # add sites
 sites <- df[!duplicated(df$territory.name), c("current.population", "origin", "territory.name")]
 lp <- merge(lp, sites, by.x="ter", by.y="territory.name")
@@ -389,8 +366,12 @@ lp <- merge(lp, sites, by.x="ter", by.y="territory.name")
 # where origin best represents their site. Hence the next line
 lp$site <- ifelse(lp$fledged==0, as.character(lp$current.population), as.character(lp$origin) )
 lp$site2 <- as.numeric(factor(lp$site, levels=c("LHNP","PC","AV")))
+
 # Remove adults attempting to breed in AV
 lp <- lp[lp$site!="AV", ]
+# remove NAs
+lp <- lp[!is.na(lp$fledged),]
+lp <- lp[lp$year2>0,]
 
 nest.end <- table(lp$year2, lp$site2)
 yrind.nest <- array(NA, dim = c(max(nest.end), nyr, nsite-1) )
@@ -417,6 +398,8 @@ for (t in 1:nyr){
   }} # s t
 
 # plot nest treatments over time
+plot.new()
+par(mfrow=c(1,2))
 plot(2011:2023, colSums(treat, na.rm=T), 
      type="b", xlab="Year", ylab="Number treated",
      main="All Sites")
@@ -585,8 +568,8 @@ datl <- list( # productivity data
               # survival data
               y = y,
               z = z, 
-              mu.zeroes = rep(0,p),
-              mu.zeroes2 = rep(0,p2),
+              #mu.zeroes = rep(0,p),
+              #mu.zeroes2 = rep(0,p2),
               # count data
               countsAdults = countsAD,
               countsFY = round(countsFY.all[, 1:2]/2),
@@ -708,7 +691,7 @@ inits.func1 <- function (){
   # countsAdults= matrix(c(100, 100, 100, 100, rep(NA, length(2015:2023)), rep(NA, length(2011:2023)) ), nrow=13), 
   r = mean(outp$r),
   N = outp$N[1:7,1:13,1:2, 
-              sample(seq(1, 4000, by=400), 1, replace = F)], # sample from inits of chains that worked
+              sample(seq(1, 2500, by=50), 1, replace = F)], # sample from inits of chains that worked
   z.scores = array(runif(constl$p2*constl$nsite*constl$nyr,  -0.1, 0.1),
               dim=c(constl$p2, constl$nsite, constl$nyr))
   )}
@@ -755,7 +738,7 @@ post2 <- post[!NAlist]
 outp <- MCMCpstr(out, type="chains")
 Ni.func <- function (){
     Ni <- outp$N[1:7,1:13,1:2,
-                 sample(seq(1, 5200, by=400), 1, replace = F)]
+                 sample(seq(1, 2500, by=50), 1, replace = F)]
     Ni.pva <- array(NA, dim=c(6, dim(Ni)+c(0,100,0)))
     for (sc in 1:6){
       Ni.pva[sc, 1:7, 1:13, 1:2] <- Ni

@@ -3,13 +3,13 @@ library('nimble')
 library('parallel')
 library ('coda')
 
-# load("/bsuscratch/brianrolek/riha_ipm/data.rdata")
+# load("/bsuscratch/brianrolek/riha_ipm/data-dd.rdata")
 # source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
 # load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 
 # load IPM results to get good inits
 load("C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//outputs//ipm_longrun.rdata")
-load("data//data.rdata")
+load("data//data-dd.rdata")
 library ("MCMCvis")
 
 #**********************
@@ -199,7 +199,7 @@ mycode <- nimbleCode(
     rr ~ dexp(0.05)
     
     # Productivity likelihood       
-    for (k in 1:npairsobs){
+    for (k in 1:npairstot){
       prod[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.prod[k])
       log(mu.prod[k]) <- lmu.prod[site.pair[k]] +  
@@ -210,15 +210,14 @@ mycode <- nimbleCode(
     # need to reorder because nimble doesn't 
     # handle nonconsecutive indices
     # yrind.pair is a matrix of indices for each site
-    for (t in 1:nyr){
+    for (t in 1:(nyr-1)){ # this index for dens dep ipm bc mn.prod[t-1] would cause a zero index
       for (s in 1:nsite){
-        for (xxx in 1:pair.end[t,s]){
-          prodmat[t,s,xxx] <- mu.prod[ yrind.pair[xxx,t,s] ]
+        for (xxx in 1:pair.end[t,s]){ # reorder to deal with nonconsecutive indices
+          prodmat[xxx,t,s] <- mu.prod[ yrind.pair[xxx,t,s] ]
         } # xxx
-        mn.prod[1,t,s] <- mean( prodmat[t,s,1:pair.end[t,s]] )
-        for(sc in 2:SC){
-          mn.prod[sc, t, s] <- mn.prod[1,t,s]
-        }}} # s t
+        mn.prod[t, s] <- mean.dyn( prodmat[1:358, t, s], NB[t,s] )
+      }} # s t
+    
     # Future projections- fecundity
     for(sc in 1:SC){
       for (t in (nyr+1):(nyr+K) ){

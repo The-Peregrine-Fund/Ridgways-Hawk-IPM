@@ -11,9 +11,38 @@ library ('HDInterval')
 library ('abind')
 library ('ggimage')
 load("data/data.rdata")
-load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
-out <- lapply(post[1:4], as.mcmc) # omit chain 5, causing lack of convergence in 1 param
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun.rdata")
+#load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_longrun_2025_Apr_01.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_dd_longrun_2025_Apr_03.rdata")
+out <- lapply(post[1:5], as.mcmc) # omit chain 5, causing lack of convergence in 1 param
+NAlist <- c()
+for (i in 1:length(out)){
+  NAlist[i] <- any (is.na(out[[i]][,1:286]) | out[[i]][,1:286]<0)
+}
+# Subset chains to those with good initial values
+out <- out[!NAlist]
 outp <- MCMCpstr(out, type="chains")
+niter <- dim(outp$N)[4]
+
+plot(out[[1]][, paste0("NB[1, 1]")], density=F , ylim=c(0,800))
+plot(out[[2]][, paste0("NB[1, 1]")], add=T, col="red", density=F)
+plot(out[[3]][, paste0("NB[1, 1]")], add=T, col="blue", density=F)
+plot(out[[4]][, paste0("NB[1, 1]")], add=T, col="green", density=F)
+
+plot(out[[1]][, paste0("NB[2, 1]")], density=F )
+plot(out[[2]][, paste0("NB[2, 1]")], add=T, col="red", density=F)
+plot(out[[3]][, paste0("NB[2, 1]")], add=T, col="blue", density=F)
+plot(out[[4]][, paste0("NB[2, 1]")], add=T, col="green", density=F)
+
+plot(out[[1]][, paste0("NB[3, 1]")], density=F )
+plot(out[[2]][, paste0("NB[3, 1]")], add=T, col="red", density=F)
+plot(out[[3]][, paste0("Ntot[3, 1]")], add=T, col="blue", density=F)
+plot(out[[4]][, paste0("Ntot[3, 1]")], add=T, col="green", density=F)
+
+plot(out[[1]][, paste0("Ntot[4, 1]")], density=F )
+plot(out[[2]][, paste0("Ntot[4, 1]")], add=T, col="red", density=F)
+plot(out[[3]][, paste0("Ntot[4, 1]")], add=T, col="blue", density=F)
+plot(out[[4]][, paste0("Ntot[4, 1]")], add=T, col="green", density=F)
 
 #********************
 #* Calculate summary stats
@@ -22,7 +51,7 @@ outp <- MCMCpstr(out, type="chains")
 # 2011 to 2023 pop growth, 
 # growth between start and end years of monitoring
 Nall <- apply(outp$Ntot, c(1,3) , sum)
-dimnames(Nall) <- list( Year=2011:2023, Iter=1:2000)
+dimnames(Nall) <- list( Year=2011:2023, Iter=1:niter)
 l.all.post2  <- Nall[13,] / Nall[1,]
 median((l.all.post2-1)*100)
 HDInterval::hdi((l.all.post2-1)*100)
@@ -112,7 +141,7 @@ lNall <- lNall[,c(1,4,2,3)]
 
 Ntot <- outp$Ntot[1:13,,] 
 dimnames(Ntot) <- list( Year=2011:2023, Site=c("Los Haitises", "Punta Cana"), 
-                        Iter=1:2000)
+                        Iter=1:niter)
 lN <- melt(Ntot, value.name="Abundance")
 lN <- rbind(lN, lNall)
 
@@ -131,11 +160,11 @@ df.counts.all <- data.frame(Year=2011:2023, Site_ab="Both sites", Count=counts.t
 df.counts <- rbind(df.counts, df.counts.all)
 
 p1 <- ggplot() + theme_minimal(base_size=14) +
-      # geom_image(
-      # data=data.frame(Year = 2017.5, Abundance = 120, Site="Los Haitises"), 
-      # aes(Year, Abundance, 
-      #   image = "C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\pics\\RIHA head.png"),
-      # size = 0.5) +
+      geom_image(
+      data=data.frame(Year = 2017.5, Abundance = 120, Site="Los Haitises"),
+      aes(Year, Abundance,
+        image = "C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\pics\\RIHA head.png"),
+      size = 0.5) +
   geom_line(data=lN, aes(x=Year, y=Abundance, group=Iter), 
             color="gray30", linewidth=0.1, alpha=0.01 ) +
   stat_summary(data=lN, aes(x=Year, y=Abundance), 
@@ -549,7 +578,7 @@ plot.cor <- function (lam.post, x.post, x.lab, ind.x=1:12, ind.y=1:12, site=1, y
 # P(r>0) is the probability of direction (similar to p-values)
 # that is, the probability that an effect exists
 par(mfrow=c(4,4), mar=c(4,1,3,1), oma=c(1,5,1,1))
-plot.cor(outp$lambda, outp$mn.prod, x.lab="Productivity", ind.x=2:13)
+plot.cor(outp$lambda, outp$mn.prod, x.lab="Productivity", ind.x=1:12)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n")
 mtext("Los Haitises", side=3, line=1, cex=2)
 plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n")
@@ -562,7 +591,7 @@ plot.new()
 # tiff(height=4, width=8, units="in", res=300,
 #      filename= "C://Users//rolek.brian//OneDrive - The Peregrine Fund//Documents//Projects//Ridgways IPM//figs//PopGrowthand Demographics2.tiff")
 # par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
-plot.cor(outp$lambda, outp$mn.prod, x.lab="Productivity", ind.x=2:13, site=2)
+plot.cor(outp$lambda, outp$mn.prod, x.lab="Productivity", ind.x=1:12, site=2)
 plot.cor(outp$lambda, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n", site=2)
 mtext("Punta Cana", side=3, line=1, cex=2)
 plot.cor(outp$lambda, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n", site=2)
@@ -591,28 +620,6 @@ plot.cor(outp$lambda, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", s
 plot.cor(outp$lambda, array( abs(constl$hacked.counts[,2]), c(13, 2, 2000)), x.lab="Number translocated", yaxt="n", site=2)
 mtext("Population growth rate", side=2, outer=TRUE, line=2.5, cex=2)
 # dev.off()
-
-#### ---- cors3 -----
-# Is there evidence of density dependence
-par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
-plot.cor(outp$Ntot, outp$mn.prod, x.lab="Productivity", ind.x=2:13)
-plot.cor(outp$Ntot, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n")
-plot.cor(outp$Ntot, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n")
-plot.cor(outp$Ntot, outp$mn.phiB, x.lab="Breeder Survival")
-plot.cor(outp$Ntot, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n")
-plot.cor(outp$Ntot, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n")
-mtext("Abundance", side=2, outer=TRUE, line=2.5, cex=2)
-mtext("Los Haitises", side=3, outer=TRUE, cex=2)
-
-par(mfrow=c(2,3), mar=c(4,1,1,1), oma=c(0,5,3,0))
-plot.cor(outp$Ntot, outp$mn.prod, x.lab="Productivity", ind.x=2:13, site=2)
-plot.cor(outp$Ntot, outp$mn.phiFY, x.lab="First-year Survival", yaxt="n", site=2)
-plot.cor(outp$Ntot, outp$mn.phiA, x.lab="Nonbreeder Survival", yaxt="n", site=2)
-plot.cor(outp$Ntot, outp$mn.phiB, x.lab="Breeder Survival", site=2)
-plot.cor(outp$Ntot, outp$mn.psiFYB, x.lab="First-year to Breeder", yaxt="n", site=2)
-plot.cor(outp$Ntot, outp$mn.psiAB, x.lab="Nonbreeder to Breeder", yaxt="n", site=2)
-mtext("Abundance", side=2, outer=TRUE, line=2.5, cex=2)
-mtext("Punta Cana", side=3, outer=TRUE, cex=2)
 
 #### ---- contributions -----
 #********************
@@ -851,6 +858,177 @@ legend(legend = legend.text, fill=colors,
        xpd=NA, x.intersp=0.005, text.width=NA,
        cex=1.5, horiz=TRUE)
 # dev.off()
+
+#### ---- dens_dep -----
+#*******************
+# Density dependence of demographics
+#*******************\
+par(mfrow=c(1,2))
+plot(density(outp$alphas[1,1,]), xlim=c(-0.25, 0.25), ylim=c(0, 200))
+abline(v=0, lty=2)
+lines(density(outp$alphas[2,1,]))
+lines(density(outp$alphas[3,1,]))
+lines(density(outp$alphas[4,1,]))
+lines(density(outp$alphas[5,1,]))
+lines(density(outp$alphas[6,1,]))
+
+as <- melt(outp$alphas)
+colnames(as) <- c("par.num", "site.num", "iter", "coef.val" )
+
+nms <- c("First-year survival", "Nonbreeder survival", "Breeder survival",
+         "First-year recruitment", "Nonbreeder recruitment", "Productivity")
+par.df <- data.frame(par.num=rev(1:6),
+                     par= factor(rev(nms), levels=rev(nms)))
+as <- merge(as, par.df, by="par.num")
+as$site <- ifelse(as$site.num==1, "Los Haitises", "Punta Cana")
+
+ggplot(as, aes(x=coef.val, y=par)) +
+  stat_pointinterval(point_interval = "median_hdci", 
+                     orientation = "horizontal", 
+                     .width=c(0.80, 0.95)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  facet_wrap("site", scales="free_x") +
+  #facet_grid("site", scales="free_x") +
+  xlim(-0.5, 0.25) +
+  theme_bw() + 
+  xlab("Density dependence\ncoefficient value") + ylab("Demographic rate")
+
+MCMCsummary(out, "alphas", pg0=TRUE, 
+            Rhat=TRUE, HPD=TRUE, func=pd) |> 
+  round(2)
+#### ---- density_dep_cors -----
+# Is there evidence of density dependence
+
+# create a function to plot correlations
+# between demographics and population growth rates
+plot.dd <- function (x.post, y.post, 
+                      x.lab, y.lab, 
+                      ind.x=1:12, ind.y=1:12, 
+                      site=1, yaxt="b",
+                      alpha.post=NA, 
+                      mu.num=1,
+                      trans="logit",
+                      treat.perc=0.8, 
+                      hacked.perc=0){
+  # calculate the correlation coefficient 
+  # over each iteration to propagate error
+  y <- y.post[ind.y, site,]
+  x <- x.post[ind.x, site, ]
+  df <- data.frame(ats1=c(0.8, 0.9, 1.0, 1.1, 1.2, 1.3),
+                   ats2=c(1.0, 1.5, 2.0, 2.5, 3.0, 3.5),
+                   labs1=c("0.8", NA, "1.0", NA, "1.2", NA),
+                   labs2=c("1.0", NA, "2.0", NA, "3.0", NA)
+  )
+  if(site==1){ df <- df[, c(1,3)]} else{
+    df <- df[, c(2,4)]
+  }
+  lwd <- 1
+  
+  y.m <- apply(y, 1, mean)
+  y.hdi <- apply(y, 1, HDInterval::hdi)
+  x.m <- apply(x, 1, median)
+  x.hdi <- apply(x, 1, HDInterval::hdi)
+  x.lims <- c(min(x.hdi[,]), max(x.hdi[,]))
+  y.lims <- c(min(y.hdi[,]), max(y.hdi[,]))
+  if(yaxt=="n"){
+    plot(x.m, y.m[ind.y], 
+         xlim= x.lims,
+         ylim= y.lims,
+         type="n", 
+         ylab="", xlab=x.lab, cex.lab=1.5, 
+         main=c("", "")[site],
+         yaxt=yaxt, xaxt="n")
+    axis(2, at=df[,1], labels=c(rep(NA, 5)))
+  } else {
+    plot(x.m, y.m[ind.y], 
+         xlim= x.lims,
+         ylim= y.lims,
+         type="n", 
+         ylab=y.lab, xlab=x.lab, cex.lab=1.5,  
+         main=c("", "")[site], 
+         yaxt="n", xaxt="n")
+    axis(2, at=NULL, las=1, cex.axis=1.5)
+  }
+  
+  x.pred <- seq(min(x.m), max(x.m), length=100)
+  y.pred <- array(NA, dim=c(100, ncol(alpha.post)))
+
+  if (trans=="logit"){
+    for (j in 1:100){
+      y.pred[j,] <- plogis( outp$lmus[mu.num, site, ] + alpha.post[site, ]*(x.pred[j]-constl$mnC[site])  +
+        outp$betas[mu.num, ]*hacked.perc)
+    }   }
+  if (trans=="log"){
+    for (j in 1:100){
+      y.pred[j,] <- exp( outp$lmu.prod[site, ] + outp$gamma*treat.perc +
+                           alpha.post[site, ]*(x.pred[j]-constl$mnC[site]) )
+    } }
+  
+  y.pred.m <- apply(y.pred, 1, median)
+  y.pred.hdis <- apply(y.pred, 1, HDInterval::hdi)
+  polygon(x=c(x.pred, rev(x.pred)), 
+          y=c(y.pred.hdis[1,], rev(y.pred.hdis[2,])), 
+          col=alpha("gray60", 0.7), border=NA )
+  lines(x.pred, y.pred.m, lwd=2)
+  
+  axis(1, cex.axis=1.5)
+  points(x.m, y.m, pch=1)
+  segments(x0=x.hdi[1,], x1=x.hdi[2,], 
+           y0 = y.m, y1= y.m, lwd=lwd)
+  segments(x0=x.m, x1=x.m, 
+           y0 = y.hdi[1,], y1= y.hdi[2,], lwd=lwd)
+  xs <- c(x.lims[1], x.lims[1]+(x.lims[2]-x.lims[1]*1.5))
+  ys <- c( (y.lims[2]-y.lims[1])+y.lims[1], (y.lims[2]-y.lims[1])+y.lims[1], 
+           (y.lims[2]-y.lims[1])*0.6+y.lims[1], (y.lims[2]-y.lims[1])*0.6+y.lims[1])
+  #polygon(x=c(xs, rev(xs)), y=ys, col=alpha("white", 0.7), border=NA )
+  
+  a.m <- median(alpha.post[site, ])
+  a.hdi <- HDInterval::hdi(alpha.post[site, ])
+  a.pd <- pd(alpha.post[site,])
+
+  text(x = x.lims[1], y = (y.lims[2]-y.lims[1])*0.7+y.lims[1], paste("pd = ", round(a.pd, 2), sep=""), 
+       pos = 4, font = 3, cex = 1.5)
+  
+}
+
+par(mfrow=c(2,2), mar=c(4,4,1,1), oma=c(1,1,3,0))
+plot.dd(x.post=outp$Ntot, y.post=outp$mn.phiFY, 
+         x.lab="Total Abundance", y.lab="First-year survival",
+         site=1, #yaxt="n",
+         alpha.post= outp$alphas[1,,],
+         mu.num=1, trans="logit")
+plot.dd(x.post=outp$Ntot, y.post=outp$mn.phiA, 
+        x.lab="Total Abundance", y.lab="Nonbreeder survival",
+        site=1, #yaxt="n",
+        alpha.post= outp$alphas[2,,],
+        mu.num=2)
+plot.dd(x.post=outp$Ntot, y.post=outp$mn.phiB, 
+        x.lab="Total Abundance", y.lab="Breeder survival",
+        site=1, #yaxt="n",
+        alpha.post= outp$alphas[3,,],
+        mu.num=3)
+plot.dd(x.post=outp$Ntot, y.post=outp$mn.prod, 
+        x.lab="Total Abundance", y.lab="Productivity",
+        site=1, #yaxt="n",
+        alpha.post= outp$alphas[6,,],
+        trans="log", 
+        treat.perc=0.8)
+mtext("Los Haitises", xpd=TRUE, outer=TRUE, cex=2)
+
+par(mfrow=c(1,2), mar=c(4,4,1,1), oma=c(1,1,3,0))
+plot.dd(x.post=outp$Ntot, y.post=outp$mn.psiFYB, 
+        x.lab="Total Abundance", y.lab="First-year recruitment",
+        site=2, 
+        alpha.post= outp$alphas[4,,],
+        mu.num=4, trans="logit", 
+        hacked=0.3)
+plot.dd(x.post=outp$Ntot, y.post=outp$mn.prod, 
+        x.lab="Total Abundance", y.lab="Productivity",
+        site=2, 
+        alpha.post= outp$alphas[6,,],
+        trans="log", 
+        treat.perc=0.8)
+mtext("Punta Cana", xpd=TRUE, outer=TRUE, cex=2)
 
 #*******************
 #### ---- pva_ext1 -----
