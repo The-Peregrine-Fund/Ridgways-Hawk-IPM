@@ -3,12 +3,12 @@ library('nimble')
 library('parallel')
 library ('coda')
 library ('nimbleEcology')
-source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
-load("/bsuscratch/brianrolek/riha_ipm/data-dd.rdata")
+#source("/bsuscratch/brianrolek/riha_ipm/MCMCvis.R")
+#load("/bsuscratch/brianrolek/riha_ipm/data-dd.rdata")
 #load("N-inits.rdata")
 #load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm-find-inits.rdata")
-load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm-2025-09-21.rdata")
-outp <- MCMCpstr(post, type="chains")
+#load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm-2025-09-21.rdata")
+#outp <- MCMCpstr(post, type="chains")
 #load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_longrun_2025_Apr_03.rdata")
 #load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_shortrun.rdata")
 #load("/bsuscratch/brianrolek/riha_ipm/outputs/ipm_dd_long_2025_Apr_03.rdata")
@@ -17,10 +17,15 @@ outp <- MCMCpstr(post, type="chains")
 constl$p <- 8
 cpus <- 4
 
-# library (MCMCvis)
-# load("data/data-dd.rdata")
+library (MCMCvis)
+load("data/data-dd.rdata")
+constl$p <- 8
 # load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-find-inits.rdata")
 # load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_shortrun.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm-2025-09-21.rdata")
+source("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\GitHub\\Ridgways-Hawk-IPM\\R\\check_N_inits.R")
+outp <- MCMCpstr(post, type="chains")
+#outp2 <- MCMCpstr(post[-5], type="chains")
 # outp <- screen(post)
 # rm(list=c("mycode", "post"))
 # cpus <- 5
@@ -131,8 +136,8 @@ mycode <- nimbleCode(
     gamma ~ dunif(-2,2)
     rr ~ dexp(0.05)
     for (s in 1:nsite){
-    lmu.treat[s] <- logit(mu.treat[s])
-    mu.treat[s] ~ dbeta(1,1)
+      lmu.treat[s] <- logit(mu.treat[s])
+      mu.treat[s] ~ dbeta(1,1)
     }
     
     # Productivity likelihood      
@@ -140,25 +145,29 @@ mycode <- nimbleCode(
       prod[k] ~ dnegbin(ppp[k], rr)
       ppp[k] <- rr/(rr+mu.prod[k])
       log(mu.prod[k]) <- mn.prod[treat.pair[k] + 1,  year.pair[k], site.pair[k]]
-        # covariate as sum to zero contrasts
-        # intercept remains the overall mean
-        #gamma*c(-1,1)[ treat.pair[k] + 1]
+      # covariate as sum to zero contrasts
+      # intercept remains the overall mean
+      #gamma*c(-1,1)[ treat.pair[k] + 1]
     } # k
     for (t in 1:(nyr-1)){ # this index for dens dep ipm bc mn.prod[t-1] would cause a zero index
       for (s in 1:nsite){
         for (tr in 1:2){
-        mn.prod[tr, t, s] <-  lmu.prod[s] + 
-            gamma*c(-1,1)[ tr ] +
-            alphas[6, s]*(Ntot[t, s]-mnC[s]) + 
-            eta[7, s, t]
+          mn.prod[tr, t, s] <-  lmu.prod[s] + 
+            gamma*c(-1,1)[ tr ]
+          #alphas[6, s]*(Ntot[t, s]-mnC[s]) + 
+           # eta[7, s, t]
         }
         # percent of breeding territories treated for parasitic bot flies
-        num.treat[t,s] ~ dpois( ptreat[t,s]*NB[t,s] ) # binomial doesn't sample
-        logit(ptreat[t,s]) <- lmu.treat[s] + 
-          eta[8, s, t]
+        num.treat[t,s] ~ dpois( NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
+                                  NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
+                                  NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s])* # breeders remaining
+          ptreat[t, s] ) # binomial doesn't sample
+        logit(ptreat[t,s]) <- lmu.treat[s] #+
+          #eta[8, s, t]
+        #ptreat[t,s] <- 0.7
       }} # s t
     
-    # GOF for productivity
+    # # GOF for productivity
     for (k in 1:npairsobs){
       f.obs[k] <- prod[k] # observed counts
       f.exp[k] <- mu.prod[k] # expected counts adult breeder
@@ -180,32 +189,45 @@ mycode <- nimbleCode(
     ################################
     # Abundance for year=1
     for (s in 1:nsite){
-    for (v in 1:10){
+      for (v in c(1,2,3,4,5,7,8,9)){
         # subtract one to allow dcat to include zero
-        N[v, 1, s] <- N2[v, 1, s] - 1
-        N2[v, 1, s] ~ dcat(pPrior[v, 1:s.end[v,s], s]) # Priors differ for FYs and adults
+        N[v, 1, s] <- N2[v, s] - 1
+        N2[v, s] ~ dcat(pPrior[v, 1:s.end[v,s], s]) # Priors differ for FYs and adults
       } # t
-      } # s
+      N[6, 1, s] <- 0
+      N[10, 1, s] <- 0
+    } # s
+
     # Abundance for years > 1
     for (t in 1:(nyr-1)){
       for (s in 1:nsite){
         # Number of wild born juvs
         # treated nests
+        # NBR1[t+1, s] ~ dpois((NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
+        #                        NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
+        #                        NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))* # breeders remaining
+        #                       ptreat[t, s])
+        # NBR2[t+1, s] ~ dpois((NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
+        #                       NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
+        #                       NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))* # breeders remaining
+        #                       (1-ptreat[t, s]))
         N[1, t+1, s] ~ dpois(
-          (NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
-             NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
-             NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))* # breeders remaining
-            ptreat[t, s]*
-            mn.prod[2, t, s]/2 )
+          # (NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
+          #    NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
+          #    NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))* # breeders remaining
+          #   ptreat[t, s]*
+          num.treat[t, s]* (mn.prod[2, t, s]/2) )
         # untreated nests
         #N[2, t+1, s] <- 0
         N[2, t+1, s] ~ dpois(
-          (NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
-          NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
-          NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))* # breeders remaining
-                 (1-ptreat[t, s]) *
-                mn.prod[1, t, s]/2 )
-         # end Poisson
+          # (NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
+          #    NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
+          #    NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))* # breeders remaining
+          #   (1-ptreat[t, s]) *
+          ((NFY[t, s]*mn.phiFY[t, s]*mn.psiFYB[t, s] + # first year breeders
+             NF[t, s]*mn.phiA[t, s]*mn.psiAB[t, s] + # nonbreeders to breeders
+             NB[t, s]*mn.phiB[t, s]*(1-mn.psiBA[t, s]))-num.treat[t, s])* (mn.prod[1, t, s]/2) )
+        # end Poisson
         # mn.prod should be t+1 in a postbreeding ipm
         # but here we specify as t to prevent an acyclic graph
         # and we adjust time indices in the productivity model
@@ -227,7 +249,7 @@ mycode <- nimbleCode(
       N[10, t+1, 1] <- 0 # immigrants to breeder
       N[10, t+1, 2] <- 0 # set to zero for PC, isolated
     } # t
-
+    
     # Count likelihoods, state-space model, and observation process
     for (t in 1:nyr){
       for (s in 1:nsite){
@@ -303,7 +325,7 @@ mycode <- nimbleCode(
       }} # t
     tturn.rep[1] <- sum(tt3.repAD[1:(nyr-2), 1:nsite])
     tturn.rep[2] <- sum(tt3.repFY[1:(nyr-2), 1:nsite])
-
+    
     # ###############################
     # Likelihood for survival
     # ###############################
@@ -341,52 +363,52 @@ mycode <- nimbleCode(
         logit(mn.psiFYB[t,s]) <- lmn.psiFYB[t,s]
         logit(mn.psiAB[t,s]) <- lmn.psiAB[t,s]
         logit(mn.psiBA[t,s]) <- lmn.psiBA[t,s]
-
-        lmn.phiFY[t,s] <- lmus[1,s] + eta[1,s,t] 
-          alphas[1,s]*(Ntot[t, s]-mnC[s])
+        
+        lmn.phiFY[t,s] <- lmus[1,s] #+ eta[1,s,t] 
+        #alphas[1,s]*(Ntot[t, s]-mnC[s])
         lmn.phiA[t,s] <- lmus[2,s]  #eta[2,s,t] + KEEP OFF
-          alphas[2,s]*(Ntot[t, s]-mnC[s])
-        lmn.phiB[t,s] <- lmus[3,s] + eta[3,s,t] 
-          alphas[3,s]*(Ntot[t, s]-mnC[s])
-        lmn.psiFYB[t,s] <- lmus[4,s] + eta[4,s,t] 
-          alphas[4,s]*(Ntot[t, s]-mnC[s])
-        lmn.psiAB[t,s] <- lmus[5,s] + eta[5,s,t] 
-          alphas[5,s]*(Ntot[t, s]-mnC[s])
+        #alphas[2,s]*(Ntot[t, s]-mnC[s])
+        lmn.phiB[t,s] <- lmus[3,s] #+ eta[3,s,t] 
+        #alphas[3,s]*(Ntot[t, s]-mnC[s])
+        lmn.psiFYB[t,s] <- lmus[4,s] #+ eta[4,s,t] 
+        #alphas[4,s]*(Ntot[t, s]-mnC[s])
+        lmn.psiAB[t,s] <- lmus[5,s] #+ eta[5,s,t] 
+        #alphas[5,s]*(Ntot[t, s]-mnC[s])
         lmn.psiBA[t,s] <- lmus[6,s]
       } # s
-    for (i in 1:nind){
-      # include individual effects here
+      for (i in 1:nind){
+        # include individual effects here
         #Survival
         logit(phiFY[i,t]) <- 
           lmn.phiFY[t, site[i,t]] #+
-          #betas[1]*c(-1, 1)[ hacked[i]+1 ]
+        #betas[1]*c(-1, 1)[ hacked[i]+1 ]
         logit(phiA[i,t]) <- 
           lmn.phiA[t, site[i,t]] #+
-          #betas[2]*c(-1, 1)[ hacked[i]+1 ]
+        #betas[2]*c(-1, 1)[ hacked[i]+1 ]
         logit(phiB[i,t]) <- 
           lmn.phiB[t, site[i,t]] #+
-          #betas[3]*c(-1, 1)[ hacked[i]+1 ]
+        #betas[3]*c(-1, 1)[ hacked[i]+1 ]
         #Recruitment
         logit(psiFYB[i,t]) <- 
           lmn.psiFYB[t, site[i,t]] #+
-          #betas[4]*c(-1, 1)[ hacked[i]+1 ]
+        #betas[4]*c(-1, 1)[ hacked[i]+1 ]
         
         logit(psiAB[i,t]) <- 
-          lmn.psiAB[t, site[i,t]] +
-          betas[5]*c(-1, 1)[ hacked[i]+1 ]
+          lmn.psiAB[t, site[i,t]] #+
+          #betas[5]*c(-1, 1)[ hacked[i]+1 ]
         logit(psiBA[i,t]) <- 
           lmn.psiBA[t, site[i,t]]
         #Re-encounter
         logit(pA[i,t]) <- 
           lmus[7, site[i,t]] #+  
-          #deltas[5]*effort2[t, site[i,t]] + 
-          #deltas[6]*effort2[t, site[i,t]]^2# resight of nonbreeders
+        #deltas[5]*effort2[t, site[i,t]] + 
+        #deltas[6]*effort2[t, site[i,t]]^2# resight of nonbreeders
         logit(pB[i,t]) <- 
-          lmus[8, site[i,t]] +
-          eta[6, site[i,t],t] #+
-          #betas[7]*c(-1, 1)[ hacked[i]+1 ] + 
-          #deltas[7]*effort2[t, site[i,t]] + 
-          #deltas[8]*effort2[t, site[i,t]]^2# resight of breeders
+          lmus[8, site[i,t]] #+
+          #eta[6, site[i,t],t] #+
+        #betas[7]*c(-1, 1)[ hacked[i]+1 ] + 
+        #deltas[7]*effort2[t, site[i,t]] + 
+        #deltas[8]*effort2[t, site[i,t]]^2# resight of breeders
       }#t
     }#i
     
@@ -463,12 +485,12 @@ run_ipm <- function(info, datl, constl, code, outp){
   params <- c(
     # fecundity
     "lmu.prod", "gamma", "rr", "mn.prod", 
-    "mu.treat", "ptreat",
+    #"mu.treat", "ptreat",
     # survival 
     "mus", "lmus", "betas", "deltas", "alphas",
     # abundance
     #"lNAD", "lN", "lamAD",
-    "NB", "NF", "NFY", "N", "NAD",
+    "NB", "NF", "NFY", "N", "NAD", "N2",
     "r",
     "N", "Ntot",
     "lambda",
@@ -493,12 +515,13 @@ run_ipm <- function(info, datl, constl, code, outp){
     # to find good inits for N
     # see function provided in file check.N.inits
     # which specifies the get_inits() function
+    Ninits <- get_inits2(hpc=FALSE)
     list(
       # fecundity
       lmu.prod = apply(outp$lmu.prod, 1, mean),
       gamma = mean(outp$gamma),
       rr = mean(outp$rr),
-      mu.treat = c(0.80, 0.55),
+      mu.treat = c(0.99, 0.99),
       # survival
       mus = apply(outp$mus, c(1,2), mean),
       betas = apply(outp$betas, 1, mean),
@@ -509,13 +532,14 @@ run_ipm <- function(info, datl, constl, code, outp){
       z.score = apply(outp$z.score , c(1,2,3), mean),
       # counts
       r = mean(outp$r),
-      N = get_inits2(hpc=TRUE) , # sample from inits of chains that worked
+      N =  Ninits, # sample from inits of chains that worked
+      N2 = Ninits[,1,]+1,
       # immigration
       omega = runif(1, 0.01, 0.1)
     )}
   inits2 <- inits.func()
   
-  mod <- nimbleModel(code, 
+  mod <- nimbleModel(mycode, 
                      constants = constl, 
                      data = datl, 
                      inits = inits2, 
@@ -532,17 +556,99 @@ run_ipm <- function(info, datl, constl, code, outp){
   #nc=1; nt=100; ni=100000; nb=50000
   #nc=1; nt=100; ni2=250000; nb=150000
   #nc=1; nt=1; ni=3; nb=1
-  #nc=1; nt=1; ni=10000; nb=5000
-  nc=1; nt=1; ni=200; nb=0
+  nc=1; nt=1; ni=20; nb=10
+  #nc=1; nt=1; ni=5000; nb=2500
+
+  
+  inits2$N[,,] [outp8$N[,,,1] < 0] <- 1
+  inits2$N[4,13,2] <- 15
+  inits2$N[3,11,2] <- 6
+  
+  inits2$N[5,11,2] <- 0
+  inits2$N[7,11:12,2] <- 2
+  inits2$N[8,11,2] <- 2
   
   post <- runMCMC(chmc,
-                   niter = ni,
-                   nburnin = nb,
-                   nchains = nc,
-                   thin = nt,
-                   samplesAsCodaMCMC = T,
-                   setSeed = info$seed,
-                   inits = inits2)
+                  niter = ni,
+                  nburnin = nb,
+                  nchains = nc,
+                  thin = nt,
+                  samplesAsCodaMCMC = T,
+                  setSeed = par_info[[1]]$seed,
+                  inits = inits3)
+  outp8 <- MCMCpstr(post, type="chains")
+  
+  inits3 <- inits2
+  6,1
+  10,1
+  2,2
+  4,2
+  5,2
+  6,2
+  7,2
+  8,2
+  10,2
+  
+  
+  N1works <- outp8$N[,,1,1]
+  #N2works <- outp8$N[,,1,1]
+get_inits2()
+  
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_dd_longrun_2025_Apr_03.rdata")
+load("C:\\Users\\rolek.brian\\OneDrive - The Peregrine Fund\\Documents\\Projects\\Ridgways IPM\\outputs\\ipm_shortrun.rdata")
+outp10 <- MCMCpstr(post, type="chains")
+
+  inits.func <- function (){
+    # sample from working inits
+    # to find good inits for N
+    # see function provided in file check.N.inits
+    # which specifies the get_inits() function
+    Ninits <- inits2$N
+    Ninits[,,1] <- N1works
+    Ninits[,,2] <- get_inits2(hpc=FALSE)[,,2]
+    #Ninits[c(1,3,4,5,7,8,9),,2] <- outp10$N[,,2,2]
+    #Ninits[c(2,6,10),,2] <-0
+    
+    
+    list(
+      # fecundity
+      lmu.prod = apply(outp$lmu.prod, 1, mean),
+      gamma = mean(outp$gamma),
+      rr = mean(outp$rr),
+      mu.treat = c(0.80, 0.55),
+      # survival
+      mus = apply(outp$mus, c(1,2), mean),
+      betas = apply(outp$betas, 1, mean),
+      deltas = c(0,0,0,0, apply(outp$deltas, 1, mean)[5:8]),
+      alphas = apply(outp$alphas, c(1,2), mean),
+      sds = apply(outp$sds, 1, mean),
+      Ustar = apply(outp$Ustar, c(1,2), mean),
+      z.score = apply(outp$z.score , c(1,2,3), mean),
+      # counts
+      r = mean(outp$r),
+      N =  Ninits, # sample from inits of chains that worked
+      N2 = Ninits[,1,]+2,
+      # immigration
+      omega = runif(1, 0.01, 0.1)
+    )}
+  
+  
+  inits2<- inits.func()
+  post <- runMCMC(chmc,
+                  niter = ni,
+                  nburnin = nb,
+                  nchains = nc,
+                  thin = nt,
+                  samplesAsCodaMCMC = T,
+                  setSeed = par_info[[1]]$seed,
+                  inits = inits2)
+  outp8 <- MCMCpstr(post, type="chains")
+  outp8$N[,,,1]
+  inits2$N[outp8$N[,,,1]<0]
+  [1] 0 2 0 0
+  [1] 0 9 1 0
+  [1] 0 2 0 0
+  [1] 0 2 0 0
   
   return(post)
 } # run_ipm function end
